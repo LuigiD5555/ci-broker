@@ -211,3 +211,27 @@ class AdditionalInvariantTests(TestCase):
                 code = path.read_text(encoding="utf-8")
                 self.assertIsNone(re.search(
                     r"(?m)^\s*(?:from|import)\s+(?:extracta|bpfw|guenda)\b", code))
+
+    def test_trusted_plugin_registration_requires_explicit_opt_in(self):
+        from ci_broker import providers as module
+        from ci_broker.model import Quote
+
+        class DummyProvider:
+            def quote(self, spec, task):
+                return Quote(1.0, 2.0, "dummy-units")
+            def eligible(self, spec, task):
+                return True, "eligible"
+
+        class Entry:
+            name = "stabilization-fixture-adapter"
+            def load(self):
+                return DummyProvider
+
+        with mock.patch("ci_broker.providers.entry_points", return_value=[Entry()]):
+            try:
+                module.load_extensions(["stabilization-fixture-adapter"])
+                self.assertIsInstance(
+                    module.resolve({"adapter": "stabilization-fixture-adapter"}),
+                    DummyProvider)
+            finally:
+                module._REGISTRY.pop("stabilization-fixture-adapter", None)
