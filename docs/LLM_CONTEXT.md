@@ -59,3 +59,7 @@ CI_BROKER_ACCOUNTS=/path/to/providers.json ci-broker --project-root /path/to/pro
 ## Acceptance criteria for changes
 
 A code change passes only if unit tests and CLI checks pass for a Python >=3.11 environment; the project-agnostic import boundary remains intact; no cloud consumption occurs during unit tests; and docs/examples match behavior. If remote CI has not run, state `NOT_EXECUTED` instead of implying provider acceptance.
+
+## Current priority: stabilization, not new CI providers
+
+Read [PLAN_ESTABILIZACION_0_1_1.md](PLAN_ESTABILIZACION_0_1_1.md) **before changing code**. It enumerates invariants INV-01..INV-16, work packages P0..P5, regression evidence and fail-closed acceptance. The audit baseline is `43f57333ebcceab081f566ee5d86d445410e4eaf`, with 20 passing tests under Python 3.15.2 but known safety/accounting defects. Do not claim those invariants are implemented until tested. No GitHub Actions or other external CI credit expenditure, no changes to Extracta or `main`.
