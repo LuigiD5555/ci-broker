@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import signal
+import time
+from math import ceil
 from uuid import uuid4
 from .config import accounts, project, PROJECT_FILE
 from .graph import order
@@ -26,14 +29,33 @@ def local_run(cfg: dict, root: Path, profile: str, approved: bool) -> int:
         cmd = task["command"]
         print(f"[ci-broker] {task_id}: {cmd!r}", flush=True)
         try:
-            result = subprocess.run(cmd, cwd=root, timeout=float(task.get("timeout_minutes", task["expected_minutes"]))*60,
-                                    check=False, shell=False)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            proc = subprocess.Popen(cmd, cwd=root, shell=False, start_new_session=True)
+        except OSError as exc:
             print(f"[ci-broker] {task_id}: BLOCKED {type(exc).__name__}", file=sys.stderr)
             return 2
-        if result.returncode:
-            print(f"[ci-broker] {task_id}: FAIL exit={result.returncode}", file=sys.stderr)
-            return result.returncode
+        try:
+            exit_code = proc.wait(timeout=float(task.get("timeout_minutes", task["expected_minutes"]))*60)
+        except subprocess.TimeoutExpired:
+            # Kill the isolated process group, including children of the test runner.
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                proc.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+            # Parent may have exited while descendants are still running.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+            print(f"[ci-broker] {task_id}: TIMEOUT", file=sys.stderr)
+            return 124
+        if exit_code:
+            print(f"[ci-broker] {task_id}: FAIL exit={exit_code}", file=sys.stderr)
+            return exit_code
     print("[ci-broker] LOCAL_PASS (remote CI and full system acceptance not implied)")
     return 0
 
@@ -75,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise BrokerError("Project config exists; refusing overwrite")
             target.parent.mkdir(parents=True, exist_ok=True)
             template = {"schema": 1, "project_id": args.project_id or root.name,
-                        "tasks": {"check": {"command": [sys.executable, "--version"],
+                        "tasks": {"check": {"command": ["python", "--version"],
                                             "expected_minutes": 1, "timeout_minutes": 2}},
                         "profiles": {"light": ["check"]}}
             target.write_text(json.dumps(template, indent=2) + "\n", encoding="utf-8")
@@ -95,7 +117,36 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "run":
             if not args.local:
                 raise BrokerError("Remote execution not supported by this command")
-            return local_run(cfg, root, args.profile, args.approve)
+            if not args.approve:
+                raise BrokerError("Local execution requires --approve")
+            catalog = accounts()
+            local_accounts = {name: spec for name, spec in catalog.items()
+                              if spec.get("adapter") == "local"}
+            if not local_accounts:
+                raise BrokerError("No configured local execution provider")
+            ledger = Ledger()
+            decision = plan(cfg, local_accounts, args.profile, ledger.events())
+            selected = decision["selected"]
+            if selected is None:
+                raise BrokerError("Local execution blocked by provider admission: " +
+                                  repr(decision["candidates"]))
+            spec = local_accounts[selected]
+            # A metered local pool uses the same atomic reservation protocol.
+            reservation_ref = None
+            if spec.get("quota") is not None:
+                quote = next(c for c in decision["candidates"] if c["provider"] == selected)
+                reservation_ref = "local/" + uuid4().hex
+                ledger.reserve(provider=selected, spec=spec, project=cfg["project_id"],
+                               run_ref=reservation_ref, units=quote["worst_units"])
+            started = time.monotonic()
+            try:
+                return local_run(cfg, root, args.profile, approved=True)
+            finally:
+                if reservation_ref is not None:
+                    elapsed_minutes = max(0.0, (time.monotonic() - started) / 60)
+                    increment = float(spec.get("billing_increment_seconds", 60))
+                    measured = ceil(elapsed_minutes * 60 / increment) * increment / 60
+                    ledger.finish(selected, reservation_ref, units=measured)
         if args.action in ("plan", "reserve"):
             catalog = accounts()
             p = plan(cfg, catalog, args.profile, Ledger().events(),
