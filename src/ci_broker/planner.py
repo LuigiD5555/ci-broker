@@ -22,6 +22,10 @@ def plan(project: dict, accounts: dict, profile: str, events: list[dict] | None 
         reasons = []
         if independent and not spec.get("independent", False):
             reasons.append("not-independent")
+        if spec.get("adapter") != "local" and spec.get("verified") is not True:
+            reasons.append("quota-unverified")
+        if spec.get("adapter") != "local" and spec.get("quota") is None:
+            reasons.append("quota-missing")
         for task_id in names:
             task = tasks[task_id]
             eligible, why = adapter.eligible(spec, task)
