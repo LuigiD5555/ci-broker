@@ -210,4 +210,4 @@ class AdditionalInvariantTests(TestCase):
             with self.subTest(module=path.name):
                 code = path.read_text(encoding="utf-8")
                 self.assertIsNone(re.search(
-                    r"(?m)^\\s*(?:from|import)\\s+(?:extracta|bpfw|guenda)\\b", code))
+                    r"(?m)^\s*(?:from|import)\s+(?:extracta|bpfw|guenda)\b", code))
