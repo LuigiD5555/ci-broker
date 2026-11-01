@@ -93,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
         load_extensions(args.plugin)
         if args.action == "init":
             target = root / PROJECT_FILE
+            if target.is_symlink() or target.parent.is_symlink():
+                raise BrokerError("Symlink project configuration refused")
             if target.exists():
                 raise BrokerError("Project config exists; refusing overwrite")
             target.parent.mkdir(parents=True, exist_ok=True)
