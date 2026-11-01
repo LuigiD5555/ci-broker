@@ -82,6 +82,8 @@ def accounts() -> dict[str, Any]:
             from .providers import positive
             positive(spec["quota"], f"{name}.quota")
         margin = spec.get("reserve_fraction", 0.1)
+        if isinstance(margin, bool) or not isinstance(margin, (int, float)):
+            raise BrokerError(f"{name}: invalid reserve_fraction")
         try:
             margin = float(margin)
         except (TypeError, ValueError, OverflowError) as exc:
