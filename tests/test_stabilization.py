@@ -159,3 +159,55 @@ class ConfigRegression(TestCase):
                 self.assertEqual(main(["--project-root", directory, "init"]), 0)
             cfg = json.loads((Path(directory) / ".ci-broker/project.json").read_text())
             self.assertEqual(cfg["tasks"]["check"]["command"], ["python", "--version"])
+
+
+class AdditionalInvariantTests(TestCase):
+    def test_cancel_preserves_observed_usage_and_cannot_duplicate(self):
+        with TemporaryDirectory() as directory:
+            led = Ledger(Path(directory) / "ledger.jsonl")
+            led.reserve(provider="cloud", spec=remote(), project="p", run_ref="job", units=10, now=NOW)
+            led.record("cloud", "job", 3, now=NOW)
+            led.finish("cloud", "job", now=NOW)
+            led.finish("cloud", "job", now=NOW)
+            self.assertEqual(usage(led.events(), "2026-11", "cloud"), 3)
+            self.assertFalse(active(led.events(), "2026-11"))
+            self.assertEqual(len([e for e in led.events() if e["kind"] == "cancel"]), 1)
+
+    def test_plan_does_not_launch_project_commands(self):
+        cfg = sample(command=[sys.executable, "-c", "raise AssertionError('executed')"])
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("should not launch")):
+            decision = plan(cfg, {"cloud": remote()}, "light", independent=True, now=NOW)
+        self.assertEqual(decision["selected"], "cloud")
+        self.assertTrue(decision["advisory_only"])
+
+    def test_plugins_are_not_discovered_without_explicit_approval(self):
+        from ci_broker.providers import load_extensions
+        with mock.patch("ci_broker.providers.entry_points", side_effect=AssertionError("import attempted")):
+            load_extensions([])
+
+    def test_billing_numbers_reject_strings_and_booleans(self):
+        with TemporaryDirectory() as directory:
+            ledger = Ledger(Path(directory) / "ledger.jsonl")
+            for value in ("3", True, float("nan"), float("inf")):
+                with self.subTest(value=value), self.assertRaises(BrokerError):
+                    ledger.record("cloud", "run", value)
+
+    def test_init_does_not_follow_symlink_configuration(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".ci-broker").mkdir()
+            actual = root / "external.json"
+            actual.write_text("{}")
+            (root / ".ci-broker/project.json").symlink_to(actual)
+            with redirect_stderr(StringIO()):
+                self.assertEqual(main(["--project-root", str(root), "init"]), 2)
+            self.assertEqual(actual.read_text(), "{}")
+
+    def test_project_agnostic_import_boundary(self):
+        source_root = Path(__file__).resolve().parents[1] / "src/ci_broker"
+        import re
+        for path in source_root.glob("*.py"):
+            with self.subTest(module=path.name):
+                code = path.read_text(encoding="utf-8")
+                self.assertIsNone(re.search(
+                    r"(?m)^\\s*(?:from|import)\\s+(?:extracta|bpfw|guenda)\\b", code))
