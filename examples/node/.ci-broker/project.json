@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "project_id": "example-node",
+  "tasks": {
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "expected_minutes": 2,
+      "timeout_minutes": 5,
+      "capabilities": [
+        "node"
+      ]
+    },
+    "test": {
+      "needs": [
+        "lint"
+      ],
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--runInBand"
+      ],
+      "expected_minutes": 4,
+      "timeout_minutes": 12,
+      "capabilities": [
+        "node"
+      ]
+    }
+  },
+  "profiles": {
+    "light": [
+      "test"
+    ]
+  }
+}
