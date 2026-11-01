@@ -8,6 +8,14 @@
 > **Python principal de aceptación:** `3.15.2`  
 > **Restricciones:** cero ejecuciones de GitHub Actions u otros CI de pago, cero disparos remotos, cero cambios a Extracta, cero fusiones/force push a `main`.
 
+## Estado de implementación al 2026-11-01
+
+**Rama:** `fix/stabilize-0.1.1`, independiente de `main` y de Extracta.
+
+Se incorporaron las correcciones y tests de **P0–P4**, pero sus gates no pueden marcarse PASS sin una ejecución real. **P5 sigue BLOCKED** por falta de una ejecución verificable del checkout de esta rama con Python 3.15.2. La evidencia y el procedimiento están en [INFORME_VALIDACION_0_1_1.md](INFORME_VALIDACION_0_1_1.md); el comando offline es `bash scripts/validate_local.sh`. No se ejecutaron GitHub Actions ni servicios con créditos.
+
+---
+
 ## 1. Resultado que queremos conseguir
 
 Una **v0.1.1 local-first, independiente de proyectos y verificable** donde:
