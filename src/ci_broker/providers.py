@@ -6,6 +6,8 @@ from typing import Any, Mapping
 from .model import BrokerError, Quote, ProviderAdapter
 
 def positive(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise BrokerError(f"{label}: expected a numeric value")
     try:
         number = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
