@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "project_id": "extracta",
+  "tasks": {
+    "integrity": {
+      "command": [
+        "python",
+        "dev/release_files.py",
+        "check",
+        "--root",
+        ".",
+        "--strict-manifest"
+      ],
+      "expected_minutes": 1,
+      "timeout_minutes": 5,
+      "capabilities": [
+        "python"
+      ]
+    },
+    "light": {
+      "needs": [
+        "integrity"
+      ],
+      "command": [
+        "python",
+        "tools/update_manager_validation.py",
+        "light"
+      ],
+      "expected_minutes": 3,
+      "timeout_minutes": 15,
+      "capabilities": [
+        "python"
+      ]
+    },
+    "full_local": {
+      "needs": [
+        "light"
+      ],
+      "command": [
+        "bash",
+        "tools/pr6_accept_local.sh",
+        "full"
+      ],
+      "expected_minutes": 120,
+      "timeout_minutes": 180,
+      "capabilities": [
+        "docker",
+        "rust",
+        "python",
+        "linux"
+      ]
+    }
+  },
+  "profiles": {
+    "light": [
+      "light"
+    ],
+    "full": [
+      "full_local"
+    ]
+  }
+}

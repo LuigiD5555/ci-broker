@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "project_id": "example-rust",
+  "tasks": {
+    "format": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "expected_minutes": 1,
+      "timeout_minutes": 3,
+      "capabilities": [
+        "rust"
+      ]
+    },
+    "test": {
+      "needs": [
+        "format"
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--all-targets"
+      ],
+      "expected_minutes": 6,
+      "timeout_minutes": 20,
+      "capabilities": [
+        "rust"
+      ]
+    },
+    "lint": {
+      "needs": [
+        "test"
+      ],
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "expected_minutes": 4,
+      "timeout_minutes": 15,
+      "capabilities": [
+        "rust"
+      ]
+    }
+  },
+  "profiles": {
+    "light": [
+      "test"
+    ],
+    "full": [
+      "lint"
+    ]
+  }
+}

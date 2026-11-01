@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agnostic-ci-broker"
+version = "0.1.0"
+description = "Project-agnostic local-first CI planning and shared budget accounting"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "CI Broker contributors"}]
+dependencies = []
+
+[project.scripts]
+ci-broker = "ci_broker.cli:main"
+
+[project.entry-points."ci_broker.providers"]
+# Third-party packages may register trusted ProviderAdapter factories here.
+
+[tool.setuptools.packages.find]
+where = ["src"]
