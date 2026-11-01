@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "project_id": "example-go",
+  "tasks": {
+    "format": {
+      "command": [
+        "gofmt",
+        "-l",
+        "."
+      ],
+      "expected_minutes": 1,
+      "timeout_minutes": 2,
+      "capabilities": [
+        "go"
+      ]
+    },
+    "unit": {
+      "needs": [
+        "format"
+      ],
+      "command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "expected_minutes": 3,
+      "timeout_minutes": 15,
+      "capabilities": [
+        "go"
+      ]
+    }
+  },
+  "profiles": {
+    "light": [
+      "unit"
+    ]
+  }
+}
