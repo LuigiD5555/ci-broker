@@ -2,7 +2,7 @@
 
 **Project-agnostic, local-first CI planning and budget orchestration.** Install it once and reuse it across Python, Rust, Go, Java, mixed-language, or custom projects. Your project supplies **what** to test. CI Broker decides **which tests and in what order**, **where resources are available**, and **whether budget permits the run**.
 
-> **Status: v0.1.0 pre-release prototype.** Local execution and advisory provider planning are implemented. Cloud accounts, remote dispatch, auto-generated vendor pipelines, hosted quotas, and native test discovery are **not** connected yet. Never interpret a configuration file as proof that a cloud runner is active.
+> **Status: v0.1.1 stabilization candidate (runtime acceptance pending).** Local execution and advisory provider planning are implemented. Cloud accounts, remote dispatch, auto-generated vendor pipelines, hosted quotas, and native test discovery are **not** connected yet. Never interpret a configuration file as proof that a cloud runner is active.
 
 ## Quick start (5 minutes)
 
@@ -25,7 +25,7 @@ ci-broker plan --profile light
 ci-broker run --profile light --local --approve
 ```
 
-`plan` **never executes tests or spends credits**. `run` only executes project-defined commands **locally**, with no shell interpolation (`shell=False`), and requires `--approve`. The default generated project runs `python --version` as a safe placeholder, **not** as a real test suite.
+`plan` **never executes tests or spends credits**. `run` only executes project-defined commands **locally**, with no shell interpolation (`shell=False`), and requires both `--approve` **and a successful local-provider admission decision**. A disabled or incapable local provider blocks execution; timeouts terminate the isolated process group. The default generated project runs `python --version` as a safe placeholder, **not** as a real test suite.
 
 ### How it works
 
@@ -93,7 +93,7 @@ Commands are argument arrays. **Do not** use `"command": "curl ... | bash"`; str
 
 ## Shared CI budgets across projects
 
-All projects on one machine use the **same provider-account catalog and ledger**:
+All projects on one machine use the **same provider-account catalog and ledger**. An explicitly configured but missing `CI_BROKER_ACCOUNTS` file is an error, not a reason to fall back to the default local account:
 
 - Provider accounts: `~/.config/ci-broker/providers.json` or `CI_BROKER_ACCOUNTS=/absolute/path/providers.json`
 - State: `~/.local/state/ci-broker/ledger.jsonl` or `CI_BROKER_LEDGER=/absolute/path/ledger.jsonl`
@@ -127,19 +127,19 @@ Without a provider-account file, the broker offers a single **local** provider b
 }
 ```
 
-`enabled=false` keeps a provider out of recommendations. `verified=false` prevents remote **reservations**, even if someone enables the provider. Verify real quotas, actual account status, runtime capability, pricing and billing before changing either. A reservation never starts a workflow.
+`enabled=false` keeps a provider out of recommendations. `verified=false` prevents remote **selection and reservations**, even if someone enables the provider. Unverified providers remain visible as ineligible diagnostic candidates. Verify real quotas, actual account status, runtime capability, pricing and billing before changing either. A reservation never starts a workflow.
 
 ```bash
 ci-broker providers
 ci-broker plan --profile light --independent
-ci-broker reserve --profile light --provider example-cloud --run-ref project/job-123
+ci-broker reserve --profile light --provider example-cloud --run-ref project/job-123 # BLOCKED until verified/enabled
 ci-broker finish --provider example-cloud --run-ref project/job-123 --units 8
 # Or omit --units to cancel a reservation AFTER confirming no job is running.
 ci-broker record --provider example-cloud --run-ref external-job-456 --units 7
 ci-broker status
 ```
 
-The last four commands operate on the **shared ledger**. `record` is idempotent by provider/job ID. Reservations lock the file across processes, guard the worst-case time budget, and protect a configurable quota fraction (default 10%). **An unfinished job continues to hold quota across month boundaries.** Billing adjustments and remote-state reconciliation are not automated.
+The last four commands operate on the **shared ledger**. `record` is idempotent for identical observations by provider/job ID; a conflicting amount is rejected. The broker protects the **highest** observed or settled usage for a run and never silently overwrites a larger amount with a smaller one. Reservations lock the file across processes, guard the worst-case time budget, and protect a configurable quota fraction (default 10%). **An unfinished job continues to hold quota across month boundaries.** Billing adjustments and remote-state reconciliation are not automated.
 
 A per-machine ledger is **not** a distributed database. Multiple separate machines must use an explicitly coordinated shared service to enforce truly global limits; do not mount one JSONL over unreliable network filesystems and assume correctness.
 
@@ -177,6 +177,7 @@ To try any example against its own project, copy the example's `.ci-broker/proje
 ## Development and tests
 
 ```bash
+bash scripts/validate_local.sh  # offline; no GitHub Actions
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
 # Optional on-demand GitHub Actions: Actions → Core tests (manual only) → Run workflow
@@ -202,4 +203,4 @@ MIT; see [LICENSE](LICENSE).
 
 ## Stabilization plan (v0.1.1)
 
-Before expanding remote integrations or enabling cloud CI, follow the bounded [v0.1.1 stabilization plan](docs/PLAN_ESTABILIZACION_0_1_1.md) (Spanish). It records 16 safety/behavior invariants, six closed work packages (P0–P5), offline tests, release gates and explicit non-goals. **This is a plan, not an implementation or evidence of passing tests.**
+Before expanding remote integrations or enabling cloud CI, follow the bounded [v0.1.1 stabilization plan](docs/PLAN_ESTABILIZACION_0_1_1.md) (Spanish). It records 16 safety/behavior invariants, six closed work packages (P0–P5), offline tests, release gates and explicit non-goals. **The stabilization candidate implements the proposed corrections, but P5 requires actual offline execution before declaring PASS.**
