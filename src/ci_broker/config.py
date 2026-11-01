@@ -56,6 +56,8 @@ def account_path() -> Path:
 def accounts() -> dict[str, Any]:
     path = account_path()
     if not path.exists():
+        if os.environ.get("CI_BROKER_ACCOUNTS") is not None:
+            raise BrokerError(f"Explicit provider account config not found: {path}")
         return {
             "local": {
                 "adapter": "local", "enabled": True, "verified": True,
@@ -65,13 +67,29 @@ def accounts() -> dict[str, Any]:
             }
         }
     result = _object(path)
+    if not result:
+        raise BrokerError("Provider account catalog must not be empty")
     for name, spec in result.items():
         if not isinstance(spec, dict) or not isinstance(name, str) or not name:
             raise BrokerError("Invalid provider account entry")
-        if spec.get("enabled") not in (True, False) or spec.get("verified") not in (True, False):
+        if type(spec.get("enabled")) is not bool or type(spec.get("verified")) is not bool:
             raise BrokerError(f"{name}: explicit boolean enabled/verified required")
         if spec.get("adapter", "metered") != "local":
             from .providers import positive
             positive(spec.get("units_per_minute"), f"{name}.units_per_minute")
             positive(spec.get("quota"), f"{name}.quota")
+        elif spec.get("quota") is not None:
+            from .providers import positive
+            positive(spec["quota"], f"{name}.quota")
+        margin = spec.get("reserve_fraction", 0.1)
+        try:
+            margin = float(margin)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise BrokerError(f"{name}: invalid reserve_fraction") from exc
+        from math import isfinite
+        if not isfinite(margin) or not 0 <= margin < 1:
+            raise BrokerError(f"{name}: invalid reserve_fraction")
+        caps = spec.get("capabilities", [])
+        if not isinstance(caps, list) or not all(isinstance(x, str) and x for x in caps):
+            raise BrokerError(f"{name}: invalid capabilities")
     return result
