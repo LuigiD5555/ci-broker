@@ -199,3 +199,7 @@ For implementation decisions and extension boundaries, read `docs/ARCHITECTURE.m
 ## License
 
 MIT; see [LICENSE](LICENSE).
+
+## Stabilization plan (v0.1.1)
+
+Before expanding remote integrations or enabling cloud CI, follow the bounded [v0.1.1 stabilization plan](docs/PLAN_ESTABILIZACION_0_1_1.md) (Spanish). It records 16 safety/behavior invariants, six closed work packages (P0–P5), offline tests, release gates and explicit non-goals. **This is a plan, not an implementation or evidence of passing tests.**
