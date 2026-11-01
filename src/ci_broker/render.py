@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: python -m pip install project-ci-broker
+      - run: python -m pip install git+https://github.com/LuigiD5555/ci-broker.git@8ef495d1dbc7097338f3460861d91a75c83bb2d9
       - run: ci-broker plan --profile {profile}
       # Approval required for executing project commands:
       # - run: ci-broker run --profile {profile} --yes
@@ -35,7 +35,7 @@ workflow:
 verify:
   image: python:3.13-slim
   script:
-    - python -m pip install project-ci-broker
+    - python -m pip install git+https://github.com/LuigiD5555/ci-broker.git@8ef495d1dbc7097338f3460861d91a75c83bb2d9
     - ci-broker plan --profile {profile}
     # Uncomment once approved: ci-broker run --profile {profile} --yes
 '''
