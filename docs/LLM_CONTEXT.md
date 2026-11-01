@@ -1,7 +1,7 @@
 # CI Broker — handoff context for AI coding assistants
 
 **Repository:** https://github.com/LuigiD5555/ci-broker  
-**Version:** 0.1.0 prototype  
+**Version:** 0.1.1 stabilization candidate (P5 runtime acceptance pending)  
 **Purpose:** a reusable, project-agnostic, local-first CI planner and budget ledger. Extracta is a consumer, not a dependency.
 
 ## Before modifying anything
@@ -43,7 +43,7 @@ ci-broker status
 
 ## Capability status
 
-**Implemented:** project root resolution, explicit task profiles, transitive DAG ordering, cycle detection, estimate, local approval-gated execution, per-provider metered quotes, protected budget, account-shared atomic reservations, idempotent observations, explicit trusted plugin registration, JSON CLI.
+**Implemented (stabilization branch, acceptance pending):** project root resolution, explicit task profiles, transitive DAG ordering, cycle detection, estimate, local approval-gated execution, per-provider metered quotes, protected budget, account-shared atomic reservations, idempotent observations, explicit trusted plugin registration, JSON CLI.
 
 **Not implemented:** automatic language discovery, pipeline generation, remote job dispatch, quota synchronization, actual cost predictions based on history, parallel execution, remote ledger backend. Never claim any of these works now.
 
@@ -62,4 +62,13 @@ A code change passes only if unit tests and CLI checks pass for a Python >=3.11 
 
 ## Current priority: stabilization, not new CI providers
 
-Read [PLAN_ESTABILIZACION_0_1_1.md](PLAN_ESTABILIZACION_0_1_1.md) **before changing code**. It enumerates invariants INV-01..INV-16, work packages P0..P5, regression evidence and fail-closed acceptance. The audit baseline is `43f57333ebcceab081f566ee5d86d445410e4eaf`, with 20 passing tests under Python 3.15.2 but known safety/accounting defects. Do not claim those invariants are implemented until tested. No GitHub Actions or other external CI credit expenditure, no changes to Extracta or `main`.
+Read [PLAN_ESTABILIZACION_0_1_1.md](PLAN_ESTABILIZACION_0_1_1.md) **before changing code**. It enumerates invariants INV-01..INV-16, work packages P0..P5, regression evidence and fail-closed acceptance. The audit baseline is `43f57333ebcceab081f566ee5d86d445410e4eaf`, with 20 passing tests under Python 3.15.2 but known safety/accounting defects. P0-P4 regression code is in `fix/stabilize-0.1.1`; P5 requires executed tests and a recorded Python 3.15.2 result. No GitHub Actions or other external CI credit expenditure, no changes to Extracta or `main`.
+
+## v0.1.1 protected behavior
+
+- `plan`, `run` and `reserve` use consistent eligibility criteria. A rejected local plan cannot become an approved run.
+- Explicit missing `CI_BROKER_ACCOUNTS` paths fail. With no override, a local default is permissible.
+- Usage for one execution is the maximum of settlement and observations. Conflicting repeated observations are rejected pending an explicit audited reconciliation policy.
+- Cross-month reservations remain pending until their terminal event; no TTL automatically releases quota.
+- `init` writes portable `["python", "--version"]`. Local timeout terminates a process group.
+- Local acceptance command: `bash scripts/validate_local.sh` with Python 3.15.2. GitHub Actions is not required or authorized for this validation.
