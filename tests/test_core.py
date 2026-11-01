@@ -145,9 +145,16 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(BrokerError, "argv array"):
                 project(root)
 
-    def test_default_accounts_local_only(self):
+    def test_explicit_missing_accounts_config_fails_closed(self):
         with mock.patch.dict("os.environ", {"CI_BROKER_ACCOUNTS": "/this/path/does/not/exist.json"}):
-            self.assertEqual(list(accounts()), ["local"])
+            with self.assertRaises(BrokerError):
+                accounts()
+
+    def test_default_accounts_local_only_when_no_override(self):
+        with TemporaryDirectory() as t:
+            with mock.patch.dict("os.environ", {}, clear=True):
+                with mock.patch("ci_broker.config.account_path", return_value=Path(t) / "missing.json"):
+                    self.assertEqual(list(accounts()), ["local"])
 
 if __name__ == "__main__":
     unittest.main()
