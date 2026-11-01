@@ -1,0 +1,13 @@
+schema = 1
+[project]
+id = "python-sample"
+[profiles.light]
+commands = ["python -m unittest discover -s tests"]
+minutes = 3
+timeout_minutes = 10
+requires = ["python"]
+[policy]
+prefer_local = true
+require_approval = true
+allow_paid_overage = false
+reserve_fraction = 0.10

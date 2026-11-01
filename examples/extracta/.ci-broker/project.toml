@@ -1,0 +1,19 @@
+schema = 1
+[project]
+id = "extracta"
+[profiles.light]
+commands = ["python tools/update_manager_validation.py light"]
+minutes = 3
+timeout_minutes = 10
+requires = ["python"]
+[profiles.full]
+commands = ["bash tools/pr6_accept_local.sh full"]
+minutes = 120
+timeout_minutes = 180
+requires = ["python", "rust", "postgresql", "chromium", "tls"]
+independent = true
+[policy]
+prefer_local = true
+require_approval = true
+allow_paid_overage = false
+reserve_fraction = 0.10

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "project-ci-broker"
+version = "0.1.0"
+description = "Project-agnostic local-first CI planning, budgeting and execution"
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["ci", "orchestration", "test-scheduling", "local-first", "plugins"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: POSIX :: Linux"]
+
+[project.scripts]
+ci-broker = "ci_broker.cli:main"
+
+[project.entry-points."ci_broker.adapters"]
+# Third-party packages may register a trusted provider adapter under this group.
+
+[tool.setuptools.packages.find]
+where = ["src"]
