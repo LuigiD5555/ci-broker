@@ -86,6 +86,9 @@ def main(argv: list[str] | None = None) -> int:
     observed.add_argument("--provider", required=True)
     observed.add_argument("--run-ref", required=True)
     observed.add_argument("--units", type=float, required=True)
+    imported = sub.add_parser("import-run", help="Record measured units read by a trusted provider reader; never dispatches")
+    imported.add_argument("--provider", required=True)
+    imported.add_argument("--run-id", required=True)
     sub.add_parser("status", help="Report shared ledger events, with no secrets")
     args = parser.parse_args(argv)
     root = args.project_root.resolve()
@@ -114,6 +117,18 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.action == "finish":
             emit(Ledger().finish(args.provider, args.run_ref, units=args.units))
+            return 0
+        if args.action == "import-run":
+            spec = accounts().get(args.provider)
+            if spec is None:
+                raise BrokerError(f"Unknown provider account: {args.provider}")
+            reader = resolve(spec)
+            if not callable(getattr(reader, "read_run", None)):
+                raise BrokerError(f"Provider {args.provider} has no trusted run reader")
+            observation = reader.read_run(args.run_id)
+            created = Ledger().record(args.provider, observation["run_ref"], observation["units"])
+            emit({"provider": args.provider, "run_ref": observation["run_ref"],
+                  "units": observation["units"], "created": created})
             return 0
         cfg = project(root)
         if args.action == "run":
