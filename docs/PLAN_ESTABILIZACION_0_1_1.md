@@ -193,3 +193,19 @@ La validación completa requiere además CLI black-box contra dos proyectos temp
 - Evidencia local reproducible en Python 3.15.2.
 - Informe `docs/INFORME_VALIDACION_0_1_1.md` con decisión de aceptación.
 - **Sin merge, release ni activación de CI remoto en este plan.**
+
+## 11. Ruta posterior a la estabilización (no autoriza implementación)
+
+Para conservar el alcance de la visión de **CI Broker como vendor/plugin agnóstico**, estos hitos quedan ordenados pero **NO integrados en P0–P5**:
+
+| Horizonte | Objetivo | Gate para empezar |
+|---|---|---|
+| **v0.2 — SDK agnóstico** | Interfaces estables para `ProjectDetector`, `TaskRunner`, `ProviderClient` y `PipelineRenderer`; descubrimiento opcional de runtimes y perfiles sin obligar a que todos los proyectos sean Python. | v0.1.1 PASS, schema y CLI estables, pruebas en al menos dos proyectos de lenguajes distintos |
+| **v0.3 — Grafo y optimizador** | DAG granular de tareas y pruebas, historial por firma, selección por impacto/cambio, detección de ejecuciones equivalentes, packing de memoria/CPU y planificación de paralelismo. Mantener explicaciones del porqué se ejecuta o se omite cada prueba. | SDK agnóstico probado, métricas reales reproducibles y benchmarks antes/después |
+| **v0.4 — Proveedores remotos** | Generación de YAML por proveedor, lectura de saldo real, despacho/poll/cancel, cuotas verificadas por cuenta, reserva→ejecución→conciliación, autenticación opt-in y evidencia del job. | Presupuestos invariantes probados, cuentas conectadas con autorización explícita y cero overage por defecto |
+| **v0.5+ — Coordinación distribuida** | Backend transaccional para múltiples hosts, agentes voluntarios/servidores propios y políticas de asignación de recursos entre proyectos. | Necesidad real demostrada de uso multi-host y diseño de seguridad de identidades y estado |
+
+Estas fases son **horizontes de producto**, no una invitación a iterar indefinidamente. Requieren una decisión separada para implementarse. La arquitectura v0.1.1 no debe cerrarse de una manera que impida esos contratos, pero tampoco anticiparlos prematuramente.
+
+**Regla de priorización permanente:** seguridad de admisión y presupuesto > reproducibilidad y observabilidad > reutilización agnóstica > optimización > ampliación de proveedores.
+
