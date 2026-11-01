@@ -33,19 +33,22 @@ No module calls GitHub/CircleCI/Buildkite, accesses tokens, or remotely dispatch
 4. Read provider's billing-period usage and unfinished reservations.
 5. Keep a 10% protected quota margin by default.
 6. Prefer configured LOCAL provider if eligible and no independent verification requested; otherwise select the largest normalized protected headroom.
-7. Plan is advisory; reservation rechecks availability **inside a file lock**.
+7. Plan is advisory; local `run` first rechecks admission for a local provider; `reserve` rechecks quota **inside a file lock**.
 8. Remote execution is NOT implemented; reservation is NOT execution.
 
 Unit normalization: compare `remaining/quota` fractions, **never** compare raw CircleCI credits to vCPU minutes or monetary credits. Provider selection is policy guidance, not proof that pipelines exist.
 
 ## Test and execution safety
 
-- Project commands must be arrays of explicit argv tokens. The CLI uses `subprocess.run(..., shell=False)`, with cwd set to project root.
+- Project commands must be arrays of explicit argv tokens. The CLI uses `subprocess.Popen(..., shell=False, start_new_session=True)`, with cwd set to project root; timeout terminates the isolated process group.
 - Execution requires `--local --approve`; commands are **trusted code owned by the project**. Approval does not make arbitrary scripts safe.
 - No implicit external cloud API calls or automatic paid overage.
 - Unknown external adapters are rejected until the operator explicitly authorizes an installed entry point.
 - The ledger is protected by POSIX `fcntl.flock` across processes, but is not a distributed coordinator across multiple hosts.
 - Unfinished reservations remain held after an expired timeout and across month boundaries until explicitly closed.
+- Protected usage is monotonic per run: the highest settled/observed value counts, without double counting. Reductions require future explicit audit support, not silent overwrite.
+- Event timestamps and billing months are separate, allowing cross-month completion without misattribution.
+- Explicitly missing account catalogs are rejected; a default local provider is used only without an override.
 - A failed task stops downstream execution. The plan's critical path number is illustrative: concurrency is not implemented.
 
 ## Future evolution (not yet implemented)
