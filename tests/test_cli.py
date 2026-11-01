@@ -13,8 +13,12 @@ from ci_broker.cli import main
 class CLITests(unittest.TestCase):
     def test_init_plan_requires_approval_to_run(self):
         with TemporaryDirectory() as t:
+            providers = Path(t)/"providers.json"
+            providers.write_text(json.dumps({"local": {"adapter": "local", "enabled": True,
+                "verified": True, "preferred": True, "quota": None,
+                "capabilities": ["python"]}}))
             env = {"CI_BROKER_LEDGER": str(Path(t)/"ledger.jsonl"),
-                   "CI_BROKER_ACCOUNTS": str(Path(t)/"missing.json")}
+                   "CI_BROKER_ACCOUNTS": str(providers)}
             with mock.patch.dict(os.environ, env), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
                 self.assertEqual(main(["--project-root", t, "init"]), 0)
                 self.assertEqual(main(["--project-root", t, "plan", "--profile", "light"]), 0)
@@ -24,7 +28,11 @@ class CLITests(unittest.TestCase):
 
     def test_invalid_profile_fails_without_running(self):
         with TemporaryDirectory() as t:
-            with mock.patch.dict(os.environ, {"CI_BROKER_ACCOUNTS": str(Path(t)/"missing.json")}), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            providers = Path(t)/"providers.json"
+            providers.write_text(json.dumps({"local": {"adapter": "local", "enabled": True,
+                "verified": True, "preferred": True, "quota": None,
+                "capabilities": ["python"]}}))
+            with mock.patch.dict(os.environ, {"CI_BROKER_ACCOUNTS": str(providers)}), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
                 main(["--project-root", t, "init"])
                 self.assertEqual(main(["--project-root", t, "plan", "--profile", "nonexistent"]), 2)
 
