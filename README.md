@@ -164,8 +164,11 @@ No plugin is imported just because a JSON configuration names it. Plugins are tr
 
 - [Python + unittest](examples/python/.ci-broker/project.json)
 - [Rust + Cargo](examples/rust/.ci-broker/project.json)
+- [Go + go test](examples/go/.ci-broker/project.json)
+- [Node.js + npm](examples/node/.ci-broker/project.json)
 - [Extracta consumer integration](examples/extracta/.ci-broker/project.json)
 - [Provider account catalog](examples/providers.json)
+- [Quick-start guide in Spanish](docs/GUIA_RAPIDA_ES.md)
 - [LLM quick context / machine-readable interface](docs/LLM_CONTEXT.md)
 - [Architecture, contracts, security and roadmap](docs/ARCHITECTURE.md)
 
@@ -176,6 +179,7 @@ To try any example against its own project, copy the example's `.ci-broker/proje
 ```bash
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
+# Optional on-demand GitHub Actions: Actions → Core tests (manual only) → Run workflow
 python3 -m pip install -e .
 ci-broker --help
 ```
