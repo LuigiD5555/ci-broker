@@ -84,6 +84,8 @@ def usage(events: list[dict], period: str, provider: str) -> float:
 
 
 def _finite(value: float, *, allow_zero: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise BrokerError("Expected numeric accounting units")
     try:
         amount = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
