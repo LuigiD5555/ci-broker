@@ -1,8 +1,8 @@
-# CI Broker — remote CircleCI CLI and local agent tool (opt-in)
+# CI Broker — CircleCI provider backend (experimental live integration)
 
 ## Status
 
-Experimental extension on `feature/circleci-remote-cli-20261104`. **Not merged, not release-certified.** No CircleCI token, account quota, pipeline definition, or running webhook receiver is installed by committing code. This feature does not change the stabilization result for v0.1.1: P5 on the exact v0.1.1 baseline SHA passed offline (57/57, Python 3.15.2); remote CircleCI has not been authenticated or live-accepted.
+The gateway contracts are now on `main` as version 0.2.0. **CircleCI live dispatch is NOT release-certified.** No CircleCI token, account quota, pipeline definition, or running webhook receiver is installed by committing code. This feature does not change the stabilization result for v0.1.1: P5 on the exact v0.1.1 baseline SHA passed offline (57/57, Python 3.15.2); remote CircleCI has not been authenticated or live-accepted.
 
 ## Contract
 
@@ -79,29 +79,29 @@ export CI_BROKER_CIRCLECI_DEFINITION_ID="<uuid>"
 
 ```bash
 # Always use an actual checkout containing .ci-broker/project.json
-ci-broker remote --project-root /path/to/extracta plan --profile z01
+ci-broker-remote --project-root /path/to/extracta plan --profile z01
 
 # BILLABLE network operation: explicit approval, one exact SHA
-ci-broker remote --project-root /path/to/extracta dispatch \
+ci-broker-remote --project-root /path/to/extracta dispatch \
   --profile z01 --provider auto \
-  --sha f2905babf8cb85436afc47b77a72bff8956c23d1 \
+  --sha 8f805239cdc4b238d7f5b625aae1a7d57bfc16ee \
   --branch integracion/pipecraft-z01-g5b-episodes-20261104 --approve
 
 # Copy run_ref from SUBMITTED_UNVERIFIED response (not a pipeline URL)
-ci-broker remote status --run-ref remote/<sha256-request-key>
+ci-broker-remote status --run-ref remote/<sha256-request-key>
 
 # Explicit cancellation (may still consume credits)
-ci-broker remote cancel --run-ref remote/<sha256-request-key> --approve
+ci-broker-remote cancel --run-ref remote/<sha256-request-key> --approve
 
 # Ledger usage settlement requires provider-verified actual units
-ci-broker finish --provider circleci-main --run-ref remote/<sha256-request-key> --units <measured>
+ci-broker legacy finish --provider circleci-main --run-ref remote/<sha256-request-key> --units <measured>
 ```
 
 `ci-broker-remote` is an equivalent console entry point for the remote subcommands. No background polling is performed.
 
 ## Local MCP interface for tool-enabled coding agents
 
-`ci-broker-mcp` runs a **stdio** MCP server exposing four explicit tools: `ci_plan`, `ci_dispatch`, `ci_status` and `ci_cancel`. Configure these environment variables **on the host running the server**:
+`ci-broker-mcp` runs a **stdio** MCP server exposing seven tools: `ci_plan`, `ci_dispatch`, `ci_status`, `ci_cancel`, `ci_jobs`, `ci_artifacts`, and `ci_logs`. The last three return bounded metadata, not raw private log bodies or presigned artifact URLs. Configure these environment variables **on the host running the server**:
 
 ```bash
 export CI_BROKER_PROJECT_ROOT=/absolute/path/to/approved/project
@@ -113,7 +113,7 @@ export CI_BROKER_CIRCLECI_DEFINITION_ID=...
 ci-broker-mcp
 ```
 
-The MCP server requires `approve=true` on dispatch and cancel calls, and restricts tool execution to one configured checkout. It does **not** auto-install as a ChatGPT plugin or expose an authenticated public endpoint. To use it from an assistant, connect it in a compatible MCP client or deploy it behind a separately secured HTTPS/OAuth remote MCP bridge. A GitHub comment is **not** currently a command trigger and no always-on server is installed.
+The MCP server requires `approve=true` on dispatch and cancel calls, and restricts tool execution to one configured checkout. It does **not** auto-install as a ChatGPT plugin or expose an authenticated public endpoint. To use it from an assistant, connect it in a compatible MCP client or deploy it behind a separately secured HTTPS/OAuth remote MCP bridge. The new GitHub control issue #2 accepts only `/ci-broker capabilities` and `/ci-broker selftest` using public no-secret GitHub Actions. The separate operator-hosted webhook below is not deployed, and the public hook cannot dispatch billable CircleCI pipelines.
 
 ## Testing, safety and limitations
 
