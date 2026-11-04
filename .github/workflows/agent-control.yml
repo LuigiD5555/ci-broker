@@ -1,0 +1,48 @@
+name: Agent Gateway control (no remote secrets)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ci-broker-control-issue
+  cancel-in-progress: false
+
+jobs:
+  authorized-command:
+    if: >-
+      github.event.issue.number == 2 &&
+      github.event.repository.full_name == 'LuigiD5555/ci-broker' &&
+      github.event.comment.user.login == 'LuigiD5555' &&
+      github.event.comment.author_association == 'OWNER' &&
+      (github.event.comment.body == '/ci-broker capabilities' ||
+       github.event.comment.body == '/ci-broker selftest')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install trusted gateway only
+        run: python -m pip install -e .
+      - name: Validate request, run safe operation, publish minimal public receipt
+        run: |
+          set -euo pipefail
+          python -m ci_broker.control_hook \
+            --event "$GITHUB_EVENT_PATH" \
+            --repository 'LuigiD5555/ci-broker' \
+            --issue 2 \
+            --actor 'LuigiD5555' \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
