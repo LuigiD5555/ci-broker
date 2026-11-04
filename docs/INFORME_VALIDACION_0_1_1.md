@@ -1,5 +1,20 @@
 # CI Broker — Informe de validación v0.1.1
 
+## Actualización verificada — 2026-11-04: P5 BASELINE PASS
+
+La declaración de `BLOCKED` del informe original (2026-11-01) representa el estado de entonces. **P5 ya se ejecutó independientemente y aprobó sobre el commit exacto de estabilización**, sin fusionar la rama ni usar credenciales de proveedores:
+
+- **Fuente validada:** `fix/stabilize-0.1.1` en SHA `81e9fef5d7dbe8ebf756a13c6733e3f265403261`, checkout fijado y comprobado mediante `git rev-parse HEAD`.
+- **Intérprete:** Python **3.15.2**.
+- **Comando:** `PYTHON=python bash scripts/validate_local.sh`.
+- **Resultado:** **57/57 tests PASS**, `CI_BROKER_LOCAL_ACCEPTANCE_PASS`, `CI_BROKER_P5_BASELINE_ATTESTED`, salida 0.
+- **Evidencia física del ejecutor independiente:** GitHub Actions público [run 41894707651, job 126801022124](https://github.com/LuigiD5555/ci-broker/actions/runs/41894707651/job/126801022124), `completed/success`.
+
+En la rama experimental `feature/circleci-remote-cli-20261104`, el código de extensión fue validado sobre SHA `bc77f3d211c6f15b7cd64f0919db69ebd1b9aa0a`, dentro del mismo run, con **72/72** tests PASS en Python **3.13.17** y **3.15.2**, compilación e interfaz CLI verde; **MCP SDK 1.30.0 y 2.3.0** instalaron y registraron las cuatro herramientas esperadas (cuatro jobs adicionales, todos verdes). No se realizaron llamadas autenticadas a CircleCI ni se desplegó el receptor web; por tanto, **la aceptación remota end-to-end sigue pendiente**, y Z01/G5b de Extracta no queda certificada por esta evidencia.
+
+**Alcance:** este addendum documenta el PASS offline de la fuente base indicada; no declara `main` fusionada ni garantiza que los adaptadores remotos ya funcionen con una cuenta de proveedor real. Las secciones históricas siguientes se conservan como registro del bloqueo previo.
+
+
 **Fecha:** 2026-11-01  
 **Rama de implementación:** `fix/stabilize-0.1.1`  
 **Baseline auditado (externamente):** `43f57333ebcceab081f566ee5d86d445410e4eaf`  

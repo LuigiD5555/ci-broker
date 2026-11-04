@@ -2,7 +2,7 @@
 
 **Project-agnostic, local-first CI planning and budget orchestration.** Install it once and reuse it across Python, Rust, Go, Java, mixed-language, or custom projects. Your project supplies **what** to test. CI Broker decides **which tests and in what order**, **where resources are available**, and **whether budget permits the run**.
 
-> **Status: v0.1.1 stabilization candidate (runtime acceptance pending).** Local execution and advisory provider planning are implemented. Cloud accounts, remote dispatch, auto-generated vendor pipelines, hosted quotas, and native test discovery are **not** connected yet. Never interpret a configuration file as proof that a cloud runner is active.
+> **Status: v0.1.1 stabilization candidate.** Baseline P5 offline acceptance passed with Python 3.15.2 on exact commit `81e9fef5d7dbe8ebf756a13c6733e3f265403261` (57 tests; [evidence](docs/INFORME_VALIDACION_0_1_1.md)). Experimental CircleCI dispatch and stdio MCP are **not yet live-integrated**. Local execution and advisory provider planning are implemented. Cloud accounts, remote dispatch, auto-generated vendor pipelines, hosted quotas, and native test discovery are **not** connected yet. Never interpret a configuration file as proof that a cloud runner is active.
 
 ## Quick start (5 minutes)
 

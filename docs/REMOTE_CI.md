@@ -32,7 +32,7 @@ Experimental extension on `feature/circleci-remote-cli-20261104`. **Not merged, 
     "units_per_minute": 2,
     "billing_increment_seconds": 60,
     "reserve_fraction": 0.10,
-    "capabilities": ["python", "linux", "docker"]
+    "capabilities": ["python", "linux", "docker", "postgis"]
   }
 }
 ```
@@ -149,3 +149,5 @@ The bridge verifies GitHub's HMAC-SHA256 signature **before** JSON parsing; requ
 No webhook server, GitHub webhook secret, tunnel, CircleCI token or CircleCI API connection has been deployed by the PR. Do not paste them into ChatGPT. An exposed unauthenticated MCP/HTTP endpoint is **not** part of this design.
 
 **MCP SDK compatibility:** the optional `.[mcp]` supports MCP Python SDK 1.x (`FastMCP`) and 2.x (`MCPServer`) using version-aware imports. The public offline validation workflow installs the optional dependency and verifies registration of all four tools; this does not create a ChatGPT connection.
+
+For Extracta's `z01` profile, declare the `postgis` capability only when the chosen CircleCI machine can build and run the PostGIS Docker lab. The account's actual billed rate and remaining quota must be verified by the operator before enabling. An offline PASS does not imply those real capabilities.
