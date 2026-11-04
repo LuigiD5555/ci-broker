@@ -85,3 +85,27 @@ jobs:
           assert names == expected, (names, expected)
           print('CI_BROKER_MCP_TOOLS_REGISTERED 4')
           PY
+
+  baseline-v011-p5:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 81e9fef5d7dbe8ebf756a13c6733e3f265403261
+          path: baseline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.15.2'
+      - name: Independently validate exact v0.1.1 stabilization source
+        run: |
+          set -euo pipefail
+          cd baseline
+          test "$(git rev-parse HEAD)" = '81e9fef5d7dbe8ebf756a13c6733e3f265403261'
+          python -m pip install -e .
+          PYTHON=python bash scripts/validate_local.sh
+          echo CI_BROKER_P5_BASELINE_ATTESTED
