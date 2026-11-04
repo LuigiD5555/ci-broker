@@ -29,6 +29,14 @@ class CircleCIProvider:
     def _client(self) -> CircleCIClient:
         return CircleCIClient(os.environ.get("CIRCLECI_TOKEN", ""))
 
+    def _read_client(self) -> CircleCIClient:
+        return CircleCIClient(os.environ.get("CIRCLECI_TOKEN", ""), read_only=True)
+
+    def observe(self, project_slug: str, branch: str, sha: str,
+                pipeline_id: str | None = None) -> dict:
+        from .observation import observe
+        return observe(self._read_client(), project_slug, branch, sha, pipeline_id)
+
     @staticmethod
     def _context(ref: str) -> tuple[dict, dict]:
         from .config import accounts
@@ -168,9 +176,17 @@ class Gateway:
 
     def capabilities(self) -> dict:
         return {"gateway_schema": 1, "providers": sorted(_FACTORIES),
-                "operations": ["dispatch", "status", "jobs", "artifacts", "logs", "cancel"],
+                "operations": ["dispatch", "status", "jobs", "artifacts", "logs", "cancel", "observe"],
                 "raw_logs": "PRIVATE_CHANNEL_REQUIRED",
                 "automatic_billing": False, "acceptance": "NOT_ATTESTED"}
+
+    def observe(self, kind: str, project_slug: str, branch: str, sha: str,
+                pipeline_id: str | None = None) -> dict:
+        provider = _provider(kind)
+        observe = getattr(provider, "observe", None)
+        if observe is None:
+            raise BrokerError("Provider does not support read-only observation")
+        return {"gateway_schema": 1, **observe(project_slug, branch, sha, pipeline_id)}
 
     def dispatch(self, kind: str, root: Path, profile: str, provider: str,
                  sha: str, branch: str, approve: bool) -> dict:

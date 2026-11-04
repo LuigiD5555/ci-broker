@@ -20,6 +20,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--trust-provider", action="append", default=[])
     sub = p.add_subparsers(dest="action", required=True)
     sub.add_parser("capabilities")
+    o = sub.add_parser("observe", help="GET-only existing pipeline; no dispatch receipt required")
+    o.add_argument("--kind", default="circleci")
+    o.add_argument("--project-slug", required=True)
+    o.add_argument("--branch", required=True)
+    o.add_argument("--sha", required=True)
+    o.add_argument("--pipeline-id")
     d = sub.add_parser("dispatch")
     d.add_argument("--kind", default="circleci")
     d.add_argument("--project-root", type=Path, required=True)
@@ -41,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
         gateway = Gateway()
         if a.action == "capabilities":
             result = gateway.capabilities()
+        elif a.action == "observe":
+            result = gateway.observe(a.kind, a.project_slug, a.branch, a.sha, a.pipeline_id)
         elif a.action == "dispatch":
             result = gateway.dispatch(a.kind, a.project_root, a.profile,
                                       a.provider, a.sha, a.branch, a.approve)
