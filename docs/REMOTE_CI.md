@@ -147,3 +147,5 @@ A GitHub-connected assistant can then create a **top-level PR comment** containi
 The bridge verifies GitHub's HMAC-SHA256 signature **before** JSON parsing; requires action `created`, exact trusted repo and commenter, a PR (not an issue), same-repository head (not a fork), and a live GitHub API match of the PR's current head SHA. It then uses the standard broker budget and duplicate fences. The service posts the remote result back to the PR when permitted. If a reply fails, it **must not** repeat the remote dispatch.
 
 No webhook server, GitHub webhook secret, tunnel, CircleCI token or CircleCI API connection has been deployed by the PR. Do not paste them into ChatGPT. An exposed unauthenticated MCP/HTTP endpoint is **not** part of this design.
+
+**MCP SDK compatibility:** the optional `.[mcp]` supports MCP Python SDK 1.x (`FastMCP`) and 2.x (`MCPServer`) using version-aware imports. The public offline validation workflow installs the optional dependency and verifies registration of all four tools; this does not create a ChatGPT connection.

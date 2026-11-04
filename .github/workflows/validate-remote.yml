@@ -48,3 +48,35 @@ jobs:
           ci-broker-remote --help
           ci-broker-webhook --help
           python -c 'import ci_broker.remote, ci_broker.webhook; print("REMOTE_IMPORT_PASS")'
+
+  mcp-extension-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install optional MCP dependency and verify tool registry
+        run: |
+          set -euo pipefail
+          python -m pip install -e '.[mcp]'
+          python - <<'PY'
+          import asyncio
+          import inspect
+          from ci_broker.mcp_server import mcp
+          getter = getattr(mcp, 'list_tools', None)
+          if getter is None:
+              getter = mcp._tool_manager.list_tools
+          actual = getter()
+          if inspect.isawaitable(actual):
+              actual = asyncio.run(actual)
+          names = {tool.name for tool in actual}
+          expected = {'ci_plan', 'ci_dispatch', 'ci_status', 'ci_cancel'}
+          assert names == expected, (names, expected)
+          print('CI_BROKER_MCP_TOOLS_REGISTERED 4')
+          PY

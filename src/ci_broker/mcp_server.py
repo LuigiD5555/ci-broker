@@ -15,9 +15,14 @@ from .model import BrokerError
 from .remote import _choose, _settings, dispatch, status, cancel
 
 try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError as exc:
-    raise RuntimeError("Install optional dependency: pip install '.[mcp]'") from exc
+    # MCP Python SDK >= 2 renamed FastMCP to MCPServer.
+    from mcp.server.mcpserver import MCPServer as FastMCP
+except ImportError:
+    try:
+        # MCP Python SDK 1.x, retained for existing local clients.
+        from mcp.server.fastmcp import FastMCP
+    except ImportError as exc:
+        raise RuntimeError("Install optional dependency: pip install '.[mcp]'") from exc
 
 mcp = FastMCP("ci-broker")
 
