@@ -70,6 +70,24 @@ class TestGateway(unittest.TestCase):
         with self.assertRaisesRegex(BrokerError, "paginated"):
             CircleCIProvider().jobs(REF)
 
+
+    def test_second_provider_is_not_coupled_to_circleci(self):
+        from unittest.mock import patch
+        class SampleProvider:
+            kind = "stub-unit"
+            def status(self, run_ref):
+                return {"state": "SUCCESS_CI_ONLY", "run_ref": run_ref,
+                        "acceptance": "NOT_ATTESTED"}
+            def jobs(self, run_ref):
+                return {"run_ref": run_ref, "jobs": [{"number": 42}]}
+        register_provider("stub-unit", SampleProvider)
+        with patch("ci_broker.gateway._receipt", return_value=({"provider": "stub-account"}, {})):
+            with patch("ci_broker.config.accounts", return_value={
+                "stub-account": {"remote_kind": "stub-unit"}
+            }):
+                self.assertEqual(Gateway().status(REF)["state"], "SUCCESS_CI_ONLY")
+                self.assertEqual(Gateway().jobs(REF)["jobs"][0]["number"], 42)
+
     def test_provider_registration_requires_explicit_nonduplicate_factory(self):
         with self.assertRaises(BrokerError):
             register_provider("circleci", CircleCIProvider)

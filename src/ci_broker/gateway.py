@@ -68,7 +68,7 @@ class CircleCIProvider:
             if not isinstance(items, list):
                 raise BrokerError("CircleCI jobs missing")
             for j in items:
-                if not isinstance(j, dict) or type(j.get("job_number")) is not int:
+                if not isinstance(j, dict) or (j.get("job_number") is not None and type(j["job_number"]) is not int):
                     raise BrokerError("Invalid CircleCI job record")
                 jobs.append({"number": j["job_number"], "name": j.get("name"),
                              "status": j.get("status"), "workflow": w.get("name"),
