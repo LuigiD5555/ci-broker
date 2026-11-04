@@ -13,6 +13,7 @@ from .config import accounts, project
 from .ledger import Ledger
 from .model import BrokerError
 from .remote import _choose, _settings, dispatch, status, cancel
+from .gateway import Gateway
 
 try:
     # MCP Python SDK >= 2 renamed FastMCP to MCPServer.
@@ -69,6 +70,27 @@ def ci_cancel(run_ref: str, approve: bool = False) -> dict:
     """Request cancel; actual provider usage must be reconciled separately."""
     _root()
     return cancel(run_ref, approve)
+
+@mcp.tool()
+def ci_jobs(run_ref: str) -> dict:
+    """List jobs belonging to an observed SHA-bound pipeline."""
+    _root()
+    return Gateway().jobs(run_ref)
+
+
+@mcp.tool()
+def ci_artifacts(run_ref: str, job_number: int) -> dict:
+    """List artifact metadata; never return presigned private URLs."""
+    _root()
+    return Gateway().artifacts(run_ref, job_number)
+
+
+@mcp.tool()
+def ci_logs(run_ref: str, job_number: int) -> dict:
+    """Read step/error metadata, not raw console output."""
+    _root()
+    return Gateway().logs(run_ref, job_number)
+
 
 
 def main() -> None:

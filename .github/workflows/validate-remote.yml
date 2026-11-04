@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/circleci-remote-cli-20261104
+      - feature/agent-gateway-main-20261104
+      - main
 
 permissions:
   contents: read
@@ -43,7 +45,12 @@ jobs:
       - name: Smoke remote CLI and webhook in help-only mode
         run: |
           set -euo pipefail
-          ci-broker remote --help
+          ci-broker capabilities
+          ci-broker dispatch --help
+          ci-broker jobs --help
+          ci-broker legacy --help
+          ci-broker-legacy --help
+          ci-broker-remote --help
           ci-broker webhook --help
           ci-broker-remote --help
           ci-broker-webhook --help
@@ -81,9 +88,9 @@ jobs:
           if inspect.isawaitable(actual):
               actual = asyncio.run(actual)
           names = {tool.name for tool in actual}
-          expected = {'ci_plan', 'ci_dispatch', 'ci_status', 'ci_cancel'}
+          expected = {'ci_plan', 'ci_dispatch', 'ci_status', 'ci_cancel', 'ci_jobs', 'ci_artifacts', 'ci_logs'}
           assert names == expected, (names, expected)
-          print('CI_BROKER_MCP_TOOLS_REGISTERED 4')
+          print('CI_BROKER_MCP_TOOLS_REGISTERED 7')
           PY
 
   baseline-v011-p5:

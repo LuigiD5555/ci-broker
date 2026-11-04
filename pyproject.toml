@@ -13,7 +13,8 @@ authors = [{name = "CI Broker contributors"}]
 dependencies = []
 
 [project.scripts]
-ci-broker = "ci_broker.cli:main"
+ci-broker = "ci_broker.gateway_cli:main"
+ci-broker-legacy = "ci_broker.cli:main"
 ci-broker-remote = "ci_broker.remote:main"
 ci-broker-mcp = "ci_broker.mcp_server:main"
 ci-broker-webhook = "ci_broker.webhook:main"
@@ -27,3 +28,6 @@ github-actions = "ci_broker.plugins.github_actions:GitHubActionsReader"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.entry-points."ci_broker.remote_providers"]
+# Trusted third-party clients: selected explicitly via --trust-provider.
