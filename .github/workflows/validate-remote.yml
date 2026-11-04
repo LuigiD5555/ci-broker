@@ -51,7 +51,7 @@ jobs:
           ci-broker legacy --help
           ci-broker-legacy --help
           ci-broker-remote --help
-          ci-broker webhook --help
+          ci-broker legacy webhook --help
           ci-broker-remote --help
           ci-broker-webhook --help
           python -c 'import ci_broker.remote, ci_broker.webhook; print("REMOTE_IMPORT_PASS")'
