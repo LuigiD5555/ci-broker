@@ -132,7 +132,7 @@ class CircleCIClient:
         return items
 
     def cancel(self, workflow_id: str) -> dict:
-        return self.call("POST", f"/workflow/{_uuid(workflow_id, 'workflow_id')}/cancel", {})
+        return self.call("POST", f"/workflow/{_uuid(workflow_id, 'workflow_id')}/cancel")
 
 
 def _validate_identity(branch: str, sha: str) -> None:
