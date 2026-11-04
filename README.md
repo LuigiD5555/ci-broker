@@ -208,3 +208,5 @@ Before expanding remote integrations or enabling cloud CI, follow the bounded [v
 ## Experimental remote CLI and local MCP tool
 
 The opt-in [CircleCI remote extension](docs/REMOTE_CI.md) supports `ci-broker remote plan`, explicit-budget `dispatch`, one-shot `status`, and guarded `cancel`. A local stdio `ci-broker-mcp` facade is available via the optional `.[mcp]` extra. This does **not** grant ChatGPT remote access or connect a CircleCI account automatically. Feature branch only; current v0.1.1 stabilization acceptance remains pending.
+
+**GitHub command bridge (optional):** The operator-hosted `ci-broker-webhook` receives signed `issue_comment` deliveries and checks author, repository, PR head SHA and explicit `--approve` before triggering a budget-fenced profile. Setup: [REMOTE_CI.md](docs/REMOTE_CI.md). It is not hosted or enabled by this PR.

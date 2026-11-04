@@ -64,8 +64,11 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "remote":
         from .remote import main as remote_main
         return remote_main(argv[1:])
+    if argv and argv[0] == "webhook":
+        from .webhook import main as webhook_main
+        return webhook_main(argv[1:])
     parser = argparse.ArgumentParser(prog="ci-broker", description=__doc__,
-            epilog="Optional cloud commands: ci-broker remote --help")
+            epilog="Optional tools: ci-broker remote --help | ci-broker webhook --help")
     parser.add_argument("--project-root", type=Path, default=Path("."))
     parser.add_argument("--plugin", action="append", default=[], help="Explicitly trust an installed provider extension")
     sub = parser.add_subparsers(dest="action", required=True)

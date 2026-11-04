@@ -125,3 +125,25 @@ bash scripts/validate_local.sh
 The new CircleCI tests mock the HTTP client and never call a remote API. Record exact interpreter, source SHA and test result before certification. No external dispatch or account quota has been validated yet.
 
 Current scheduling uses the existing **whole-profile** provider selector; task-by-task parallel distribution and other provider adapters remain future work. A status of `SUCCESS_CI_ONLY` is not enough to pass G5b/G5c. For duplicate or UNKNOWN dispatches, inspect CircleCI manually before reconciling the held reservation; never blindly reissue the same request.
+
+## GitHub PR comment bridge (optional, no GitHub Actions credits)
+
+For a ChatGPT session with GitHub access, `ci-broker-webhook` is an operator-hosted receiver. It listens **on localhost only**. To receive GitHub deliveries, set up a trusted HTTPS forwarding tunnel to `http://127.0.0.1:8791/github` and configure GitHub Repository Settings > Webhooks with **issue_comment** events only, content type JSON, and a strong secret.
+
+```bash
+export CI_BROKER_WEBHOOK_SECRET="<random secret at least 32 chars>"
+export CI_BROKER_GITHUB_TOKEN="<least-privilege token to read PR and comment>"
+# All CircleCI, provider accounts and ledger variables from Setup still apply.
+ci-broker-webhook --project-root /absolute/path/to/extracta \
+  --repo LuigiD5555/extracta --author LuigiD5555 --host 127.0.0.1 --port 8791
+```
+
+A GitHub-connected assistant can then create a **top-level PR comment** containing exactly:
+
+```text
+/ci-broker run z01 sha=f2905babf8cb85436afc47b77a72bff8956c23d1 --approve
+```
+
+The bridge verifies GitHub's HMAC-SHA256 signature **before** JSON parsing; requires action `created`, exact trusted repo and commenter, a PR (not an issue), same-repository head (not a fork), and a live GitHub API match of the PR's current head SHA. It then uses the standard broker budget and duplicate fences. The service posts the remote result back to the PR when permitted. If a reply fails, it **must not** repeat the remote dispatch.
+
+No webhook server, GitHub webhook secret, tunnel, CircleCI token or CircleCI API connection has been deployed by the PR. Do not paste them into ChatGPT. An exposed unauthenticated MCP/HTTP endpoint is **not** part of this design.

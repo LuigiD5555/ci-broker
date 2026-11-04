@@ -16,6 +16,7 @@ dependencies = []
 ci-broker = "ci_broker.cli:main"
 ci-broker-remote = "ci_broker.remote:main"
 ci-broker-mcp = "ci_broker.mcp_server:main"
+ci-broker-webhook = "ci_broker.webhook:main"
 
 [project.optional-dependencies]
 mcp = ["mcp>=1,<3"]
