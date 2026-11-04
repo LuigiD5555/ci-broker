@@ -204,3 +204,7 @@ MIT; see [LICENSE](LICENSE).
 ## Stabilization plan (v0.1.1)
 
 Before expanding remote integrations or enabling cloud CI, follow the bounded [v0.1.1 stabilization plan](docs/PLAN_ESTABILIZACION_0_1_1.md) (Spanish). It records 16 safety/behavior invariants, six closed work packages (P0–P5), offline tests, release gates and explicit non-goals. **The stabilization candidate implements the proposed corrections, but P5 requires actual offline execution before declaring PASS.**
+
+## Experimental remote CLI and local MCP tool
+
+The opt-in [CircleCI remote extension](docs/REMOTE_CI.md) supports `ci-broker remote plan`, explicit-budget `dispatch`, one-shot `status`, and guarded `cancel`. A local stdio `ci-broker-mcp` facade is available via the optional `.[mcp]` extra. This does **not** grant ChatGPT remote access or connect a CircleCI account automatically. Feature branch only; current v0.1.1 stabilization acceptance remains pending.

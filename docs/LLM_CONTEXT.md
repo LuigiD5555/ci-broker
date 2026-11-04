@@ -11,7 +11,7 @@
 3. Run `python3 -m unittest discover -s tests -v`.
 4. Preserve the project-agnostic boundary: **do not add imports of Extracta, BPFW or Guenda into the core**.
 5. Maintain existing CLI commands and schema version unless a migration is explicitly approved.
-6. Never add automatic CI dispatch, paid usage, account tokens, or merges without authorization.
+6. Never dispatch paid CI or expose tokens without explicit per-run approval. The experimental CircleCI-only CLI requires `--approve` and operator-controlled credentials. See `docs/REMOTE_CI.md`.
 
 ## Public interface
 
@@ -45,7 +45,9 @@ ci-broker status
 
 **Implemented (stabilization branch, acceptance pending):** project root resolution, explicit task profiles, transitive DAG ordering, cycle detection, estimate, local approval-gated execution, per-provider metered quotes, protected budget, account-shared atomic reservations, idempotent observations, explicit trusted plugin registration, JSON CLI.
 
-**Not implemented:** automatic language discovery, pipeline generation, remote job dispatch, quota synchronization, actual cost predictions based on history, parallel execution, remote ledger backend. Never claim any of these works now.
+**Experimental, not acceptance-verified:** opt-in CircleCI remote dispatch, one-shot status/cancel and local stdio MCP tools exist on the feature branch, but they require operator configuration, a matching consumer workflow and a real integration test before live use.
+
+**Not implemented:** automatic language discovery, pipeline generation, provider-agnostic remote dispatch, quota synchronization, actual cost predictions based on history, parallel execution, remote ledger backend, hosted ChatGPT connector. Never claim these exist.
 
 ## Common usage
 
@@ -72,3 +74,7 @@ Read [PLAN_ESTABILIZACION_0_1_1.md](PLAN_ESTABILIZACION_0_1_1.md) **before chang
 - Cross-month reservations remain pending until their terminal event; no TTL automatically releases quota.
 - `init` writes portable `["python", "--version"]`. Local timeout terminates a process group.
 - Local acceptance command: `bash scripts/validate_local.sh` with Python 3.15.2. GitHub Actions is not required or authorized for this validation.
+
+## Feature-branch CLI for coding agents
+
+`ci-broker remote --project-root /path/to/project plan --profile NAME` is read-only. `ci-broker remote --project-root /path/to/project dispatch --profile NAME --sha SHA40 --branch BRANCH --provider auto --approve` is an explicitly billable action, guarded by budget and duplicate identity. `ci-broker remote status --run-ref REF` reads one saved receipt. `ci-broker remote cancel --run-ref REF --approve` cancels workflow jobs without releasing credits automatically. Local stdio `ci-broker-mcp` exposes `ci_plan`, `ci_dispatch`, `ci_status`, `ci_cancel` when `.[mcp]` is installed and a single `CI_BROKER_PROJECT_ROOT` is configured. ChatGPT cannot invoke a local stdio process through its GitHub connector alone.

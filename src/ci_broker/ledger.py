@@ -13,7 +13,7 @@ from typing import Iterator
 
 from .model import BrokerError
 
-KINDS = frozenset(("reserve", "settle", "cancel", "observed", "billing"))
+KINDS = frozenset(("reserve", "settle", "cancel", "observed", "billing", "receipt"))
 
 
 def utc() -> datetime:
@@ -182,7 +182,8 @@ class Ledger:
             os.close(fd)
 
     def reserve(self, *, provider: str, spec: dict, project: str, run_ref: str,
-                units: float, now: datetime | None = None) -> dict:
+                units: float, now: datetime | None = None,
+                reject_existing: bool = False, global_ref: bool = False) -> dict:
         now = now or utc()
         units = _finite(units)
         if not all(isinstance(x, str) and x for x in (provider, project, run_ref)):
@@ -193,7 +194,11 @@ class Ledger:
             raise BrokerError("Remote provider account quota unverified")
         period = now.strftime("%Y-%m")
         with self.locked() as events:
+            if global_ref and any(e.get("kind") == "reserve" and e.get("run_ref") == run_ref for e in events):
+                raise BrokerError("Remote request already reserved on a provider; inspect before retrying")
             previous = [e for e in events if e.get("provider") == provider and e.get("run_ref") == run_ref]
+            if previous and reject_existing:
+                raise BrokerError("Remote request already reserved; inspect before retrying")
             if previous:
                 first = next((e for e in previous if e["kind"] == "reserve"), None)
                 if first is not None and first["project"] == project and first["units"] == units and (
@@ -247,6 +252,29 @@ class Ledger:
                 event["units"] = units
             self._write(event)
             return event
+
+    def record_receipt(self, provider: str, run_ref: str, pipeline_id: str,
+                       sha: str, branch: str, *, now: datetime | None = None) -> dict:
+        """Bind one remote provider receipt to one admitted reservation.
+
+        Receipt events carry identity only; they do not release reserved credits.
+        """
+        now = now or utc()
+        if not all(isinstance(x, str) and x for x in
+                   (provider, run_ref, pipeline_id, sha, branch)):
+            raise BrokerError("Invalid remote receipt identity")
+        with self.locked() as events:
+            reserved = [e for e in events if e.get("kind") == "reserve" and
+                        e.get("provider") == provider and e.get("run_ref") == run_ref]
+            if len(reserved) != 1:
+                raise BrokerError("Remote receipt requires exactly one reservation")
+            if any(e.get("kind") == "receipt" and e.get("run_ref") == run_ref for e in events):
+                raise BrokerError("Remote dispatch receipt already exists")
+            receipt = {"kind": "receipt", "provider": provider, "run_ref": run_ref,
+                       "pipeline_id": pipeline_id, "sha": sha, "branch": branch,
+                       "at": now.isoformat()}
+            self._write(receipt)
+            return receipt
 
     def record(self, provider: str, run_ref: str, units: float, *,
                now: datetime | None = None) -> bool:

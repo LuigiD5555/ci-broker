@@ -60,7 +60,12 @@ def local_run(cfg: dict, root: Path, profile: str, approved: bool) -> int:
     return 0
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="ci-broker", description=__doc__)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "remote":
+        from .remote import main as remote_main
+        return remote_main(argv[1:])
+    parser = argparse.ArgumentParser(prog="ci-broker", description=__doc__,
+            epilog="Optional cloud commands: ci-broker remote --help")
     parser.add_argument("--project-root", type=Path, default=Path("."))
     parser.add_argument("--plugin", action="append", default=[], help="Explicitly trust an installed provider extension")
     sub = parser.add_subparsers(dest="action", required=True)
