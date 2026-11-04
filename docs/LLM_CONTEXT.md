@@ -1,3 +1,9 @@
+# Instrucción de continuidad (Agent Gateway en main)
+
+El destino de CI Broker es un gateway agnóstico a proveedores y asistentes. `ci_broker.gateway.Gateway` es la API principal, `ci_broker.cli` es legado compatible. `main` original está en `legacy/original-main-20261104`. El control GitHub en issue #2 solo admite `capabilities` y `selftest`: no gastar créditos ni publicar evidencia privada. No declarar CircleCI o Extracta G5b validada sin evidencia auténtica. Ver `docs/GATEWAY_MAIN.md`.
+
+---
+
 # CI Broker — handoff context for AI coding assistants
 
 **Repository:** https://github.com/LuigiD5555/ci-broker  

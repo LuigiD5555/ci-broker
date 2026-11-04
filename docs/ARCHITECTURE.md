@@ -1,3 +1,11 @@
+# Arquitectura canónica Agent Gateway
+
+`ci_broker.gateway.Gateway` es el límite de aplicación. Transportes CLI/MCP/GitHub y adaptadores de proveedores son independientes. El DAG, planificador y ledger originales se mantienen como compatibilidad legacy. Ver [GATEWAY_MAIN.md](GATEWAY_MAIN.md).
+
+---
+
+## Contratos 0.1.1 preservados (legacy)
+
 # Architecture and behavioral contracts
 
 ## Design rule

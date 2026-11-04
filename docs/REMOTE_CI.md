@@ -2,7 +2,7 @@
 
 ## Status
 
-Experimental extension on `feature/circleci-remote-cli-20261104`. **Not merged, not release-certified.** No CircleCI token, account quota, pipeline definition, or running webhook receiver is installed by committing code. This feature does not change the stabilization result for v0.1.1: P5 remains TEST_PENDING until its offline harness actually passes.
+Experimental extension on `feature/circleci-remote-cli-20261104`. **Not merged, not release-certified.** No CircleCI token, account quota, pipeline definition, or running webhook receiver is installed by committing code. This feature does not change the stabilization result for v0.1.1: P5 on the exact v0.1.1 baseline SHA passed offline (57/57, Python 3.15.2); remote CircleCI has not been authenticated or live-accepted.
 
 ## Contract
 

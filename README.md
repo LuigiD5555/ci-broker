@@ -1,3 +1,33 @@
+# CI Broker · Agent Gateway (v0.2.0)
+
+**Main = gateway para agentes.** Una interfaz de CI independiente del proveedor y del cliente: ChatGPT/GitHub, MCP, CLI; CircleCI es el primer backend implementado.
+
+### Inicio rápido
+
+```bash
+python -m pip install -e '.[mcp]'
+ci-broker capabilities
+ci-broker dispatch --help
+ci-broker legacy --help
+ci-broker-legacy --help
+ci-broker-mcp
+```
+
+**El CI Broker anterior sigue disponible** en [legacy/original-main-20261104](../../tree/legacy/original-main-20261104) (SHA `a8ed1bb6199cddf7d9d9f841ff36528bf7bf0c2c`). Su motor local sigue instalado mediante `ci-broker legacy`.
+
+### Control desde ChatGPT por GitHub
+
+En el [issue #2](https://github.com/LuigiD5555/ci-broker/issues/2) puedo escribir `/ci-broker capabilities` o `/ci-broker selftest` con la conexión GitHub existente. El workflow en `main` valida usuario y issue exactos; solo devuelve información pública y ejecuta pruebas offline. **La ejecución remota con gastos está deshabilitada en este hook** y no se registran secretos ni logs privados.
+
+### Estado de la integración
+
+Las operaciones de Gateway `dispatch/status/jobs/artifacts/logs/cancel` son agnósticas al transporte. Solo CircleCI cuenta con backend remoto; `logs` obtiene metadatos de pasos, no stdout privado. MCP incluye siete herramientas; el endpoint remoto autenticado aún no está alojado ni conectado a ChatGPT.
+
+Documentación: [Diseño principal](docs/GATEWAY_MAIN.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Conexión CircleCI](docs/REMOTE_CI.md) · [Validación](docs/INFORME_VALIDACION_0_1_1.md)
+
+---
+
+## Base histórica 0.1.1 (legacy compatibility)
 # CI Broker
 
 **Project-agnostic, local-first CI planning and budget orchestration.** Install it once and reuse it across Python, Rust, Go, Java, mixed-language, or custom projects. Your project supplies **what** to test. CI Broker decides **which tests and in what order**, **where resources are available**, and **whether budget permits the run**.

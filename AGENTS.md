@@ -1,3 +1,14 @@
+# Agent Gateway rules (canonical)
+
+* New features belong to `ci_broker.gateway` and trusted provider adapters, not to agent-specific transport code.
+* Preserve the old planner and CLI at `ci-broker legacy` and the `legacy/original-main-20261104` branch.
+* Never place CircleCI tokens, Extracta source, private logs, artifact bytes or presigned URLs into public GitHub issue comments or Actions logs.
+* The public issue #2 hook only accepts owner `capabilities` and `selftest`, with no remote spend.
+* Do not claim provider acceptance, physical tests or automatic billing reconciliation from mocked contracts.
+* Update DAG/ledger only with explicit reservations, SHA binding and durable budget guarantees.
+
+---
+
 # Instructions for coding agents
 
 Read `docs/LLM_CONTEXT.md` and `docs/ARCHITECTURE.md` before making architectural changes.
