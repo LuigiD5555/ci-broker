@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "project_id": "example-python",
+  "tasks": {
+    "syntax": {
+      "command": [
+        "python",
+        "-m",
+        "compileall",
+        "-q",
+        "src"
+      ],
+      "expected_minutes": 1,
+      "timeout_minutes": 3,
+      "capabilities": [
+        "python"
+      ]
+    },
+    "unit": {
+      "needs": [
+        "syntax"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "expected_minutes": 2,
+      "timeout_minutes": 8,
+      "capabilities": [
+        "python"
+      ]
+    }
+  },
+  "profiles": {
+    "light": [
+      "unit"
+    ],
+    "full": [
+      "unit"
+    ]
+  }
+}

@@ -1,114 +1,160 @@
+"""No network, cloud credentials, persistent user files or remote execution."""
 from __future__ import annotations
-
+from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
-import tempfile
+from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
 
-from ci_broker.config import initialize, load_project, load_providers
-from ci_broker.cli import main
-from ci_broker.ledger import Ledger
-from ci_broker.models import ConfigError, Profile, Quote, adapter_for, register_adapter
-from ci_broker.scheduler import plan
+from ci_broker.config import project, accounts
+from ci_broker.graph import order, estimate
+from ci_broker.ledger import Ledger, active, usage
+from ci_broker.model import BrokerError
+from ci_broker.planner import plan
+from ci_broker.providers import MeteredProvider, resolve
 
+def sample():
+    return {"schema": 1, "project_id": "sample", "tasks": {
+        "format": {"command": ["python", "--version"], "expected_minutes": 1, "capabilities": ["python"]},
+        "tests": {"needs": ["format"], "command": ["python", "--version"],
+                  "expected_minutes": 2, "timeout_minutes": 5, "capabilities": ["python"]}
+    }, "profiles": {"light": ["tests"]}}
 
-class CoreTests(unittest.TestCase):
-    def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.dir.cleanup)
-        self.root = Path(self.dir.name)
-        initialize(self.root)
-        self.ledger = Ledger(self.root / "ledger.jsonl")
-        self.env = mock.patch.dict(os.environ, {"CI_BROKER_LEDGER": str(self.ledger.path), "CI_BROKER_PROVIDERS_DIR": str(self.root / "no-providers")})
-        self.env.start()
-        self.addCleanup(self.env.stop)
+def catalog():
+    return {
+        "local": {"adapter": "local", "enabled": True, "verified": True, "preferred": True,
+                  "independent": False, "quota": None, "capabilities": ["python"]},
+        "cloud": {"adapter": "metered", "enabled": True, "verified": True,
+                  "independent": True, "quota": 30, "unit": "credits", "units_per_minute": 2,
+                  "reserve_fraction": .1, "capabilities": ["python"]}
+    }
 
-    def test_project_contract_and_do_not_overwrite(self):
-        project = load_project(self.root)
-        self.assertEqual(project.identifier, "my-project")
-        self.assertEqual(project.profiles["light"].timeout_minutes, 10)
-        with self.assertRaises(FileExistsError):
-            initialize(self.root)
+class GraphTests(unittest.TestCase):
+    def test_transitive_inclusion_once(self):
+        cfg = sample()
+        self.assertEqual(order(cfg["tasks"], ["tests", "format"]), ["format", "tests"])
 
-    def test_local_first_plan_without_network(self):
-        project = load_project(self.root)
-        decision = plan(project, project.profiles["light"], load_providers(), [])
-        self.assertEqual(decision["selected"], "local")
-        self.assertEqual(decision["advisory_only"], True)
-        self.assertEqual(decision["options"][0]["provider"], "circleci")
+    def test_cycle_is_rejected(self):
+        cfg = sample()
+        cfg["tasks"]["format"]["needs"] = ["tests"]
+        with self.assertRaisesRegex(BrokerError, "cycle"):
+            order(cfg["tasks"], ["tests"])
 
-    def test_external_requires_verification(self):
-        project = load_project(self.root)
-        result = plan(project, project.profiles["light"], load_providers(), [], independent=True)
-        self.assertIsNone(result["selected"])
+    def test_missing_dependency_is_rejected(self):
+        with self.assertRaisesRegex(BrokerError, "Unknown task"):
+            order({"x": {"needs": ["not-there"]}}, ["x"])
 
-    def test_provider_json_override(self):
-        folder = self.root / "operator"
-        folder.mkdir()
-        (folder / "extra.json").write_text(json.dumps({"github": {"enabled": True, "verified": True},
-                                                       "custom": {"adapter": "metered", "enabled": False, "verified": False,
-                                                                  "quota": 100, "rate_per_minute": 1, "unit": "credits", "capabilities": ["python"]}}))
-        with mock.patch.dict(os.environ, {"CI_BROKER_PROVIDERS_DIR": str(folder)}):
-            data = load_providers()
-        self.assertTrue(data["github"]["verified"])
-        self.assertIn("custom", data)
+    def test_estimate_distinguishes_serial_and_critical_path(self):
+        cfg = sample()
+        result = estimate(cfg["tasks"], ["format", "tests"])
+        self.assertEqual(result["serial_expected_minutes"], 3)
+        self.assertEqual(result["critical_path_minutes"], 3)
 
-    def test_quote_different_billing_increment(self):
-        profile = Profile("light", ("true",), 1.5, 2.25, frozenset(["python"]))
-        quote = adapter_for({"adapter": "metered"}).quote({"rate_per_minute": 2, "billing_increment_seconds": 1, "unit": "vcpu-min"}, profile)
-        self.assertEqual((quote.expected, quote.worst), (3, 4.5))
+class ProviderTests(unittest.TestCase):
+    def test_ceil_billing_is_per_provider(self):
+        q = MeteredProvider().quote({"units_per_minute": 2, "unit": "credits",
+                                      "billing_increment_seconds": 60},
+                                     {"expected_minutes": 1.1, "timeout_minutes": 3.1})
+        self.assertEqual((q.expected_units, q.worst_units, q.unit), (4, 8, "credits"))
 
-    def test_cli_refuses_run_without_explicit_approval(self):
-        self.assertEqual(main(["--project-root", str(self.root), "run", "--profile", "light"]), 2)
+    def test_unknown_adapter_never_loads_project_supplied_python(self):
+        with self.assertRaisesRegex(BrokerError, "Unknown adapter"):
+            resolve({"adapter": "fake.module:arbitrary_code"})
 
-    def test_cli_executes_only_declared_local_command(self):
-        path = self.root / ".ci-broker" / "project.toml"
-        content = path.read_text().replace("python -m unittest discover -s tests", "printf pass > output.txt")
-        path.write_text(content)
-        self.assertEqual(main(["--project-root", str(self.root), "run", "--profile", "light", "--yes"]), 0)
-        self.assertEqual((self.root / "output.txt").read_text(), "pass")
+    def test_disabled_provider_not_eligible(self):
+        ok, why = MeteredProvider().eligible({"enabled": False}, {"expected_minutes": 1})
+        self.assertFalse(ok)
+        self.assertEqual(why, "provider-disabled")
 
-    def test_run_from_any_project_root(self):
-        self.assertEqual(main(["--project-root", str(self.root), "validate"]), 0)
-        self.assertEqual(main(["--project-root", str(self.root), "plan", "--profile", "light"]), 0)
+class PlannerTests(unittest.TestCase):
+    def test_local_first(self):
+        p = plan(sample(), catalog(), "light")
+        self.assertEqual(p["selected"], "local")
+        self.assertEqual(p["tasks"], ["format", "tests"])
+        self.assertTrue(p["advisory_only"])
 
-    def test_ledger_reservation_idempotency_and_completion(self):
-        first = self.ledger.reserve("cloud", "one", "light", "same", 20, 100, 0.1, True, False)
-        second = self.ledger.reserve("cloud", "one", "light", "same", 20, 100, 0.1, True, False)
-        self.assertEqual(first, second)
-        with self.assertRaises(ConfigError):
-            self.ledger.reserve("cloud", "two", "light", "same", 20, 100, 0.1, True, False)
-        self.ledger.finish("cloud", "same", 3)
-        with self.assertRaises(ConfigError):
-            self.ledger.finish("cloud", "same", 3)
-        self.assertEqual(Ledger.usage(self.ledger.entries(), "cloud", first["month"]), 3)
+    def test_independent_requires_external(self):
+        self.assertEqual(plan(sample(), catalog(), "light", independent=True)["selected"], "cloud")
 
-    def test_ledger_quota_protection(self):
-        self.ledger.reserve("cloud", "x", "light", "a", 30, 50, 0.1, True, False)
-        with self.assertRaises(ConfigError):
-            self.ledger.reserve("cloud", "x", "light", "b", 30, 50, 0.1, True, False)
+    def test_no_budget_does_not_admit_run(self):
+        c = catalog()
+        c["cloud"]["quota"] = 5
+        self.assertIsNone(plan(sample(), c, "light", independent=True)["selected"])
 
-    def test_ledger_unverified_external(self):
-        with self.assertRaises(ConfigError):
-            self.ledger.reserve("cloud", "x", "light", "a", 10, 100, 0.1, False, False)
+    def test_capability_restriction(self):
+        c = catalog()
+        c["cloud"]["capabilities"] = ["rust"]
+        self.assertIsNone(plan(sample(), c, "light", independent=True)["selected"])
 
-    def test_unknown_plugin_denied(self):
-        with self.assertRaises(ConfigError):
-            adapter_for({"adapter": "import.os.system"})
+class LedgerTests(unittest.TestCase):
+    def test_concurrent_reservation_no_overspend(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with TemporaryDirectory() as t:
+            led = Ledger(Path(t)/"ledger.jsonl")
+            spec = {"adapter": "metered", "enabled": True, "verified": True,
+                    "quota": 50, "reserve_fraction": .1}
+            def reserve(ref):
+                try:
+                    led.reserve(provider="cloud", spec=spec, project="a", run_ref=ref,
+                                units=30, now=datetime(2026, 11, 1, tzinfo=timezone.utc))
+                    return "ok"
+                except BrokerError:
+                    return "denied"
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                self.assertEqual(sorted(pool.map(reserve, ["1", "2"])), ["denied", "ok"])
 
-    def test_render_github_and_gitlab_only(self):
-        self.assertEqual(main(["--project-root", str(self.root), "render", "--profile", "light", "--provider", "github"]), 0)
-        self.assertEqual(main(["--project-root", str(self.root), "render", "--profile", "light", "--provider", "gitlab"]), 0)
-        self.assertEqual(main(["--project-root", str(self.root), "render", "--profile", "light", "--provider", "no-renderer"]), 2)
+    def test_cross_month_reservation_does_not_expire(self):
+        with TemporaryDirectory() as t:
+            led = Ledger(Path(t)/"ledger.jsonl")
+            spec = {"adapter": "metered", "enabled": True, "verified": True, "quota": 100}
+            led.reserve(provider="cloud", spec=spec, project="a", run_ref="job",
+                        units=30, now=datetime(2026, 11, 30, tzinfo=timezone.utc))
+            self.assertEqual(len(active(led.events(), "2026-12")), 1)
+            led.finish("cloud", "job", units=12, now=datetime(2026, 12, 1, tzinfo=timezone.utc))
+            self.assertFalse(active(led.events(), "2026-12"))
+            self.assertEqual(usage(led.events(), "2026-11", "cloud"), 12)
 
-    def test_invalid_profile_duration(self):
-        p = self.root / ".ci-broker" / "project.toml"
-        p.write_text(p.read_text().replace("timeout_minutes = 10", "timeout_minutes = 2"))
-        with self.assertRaises(ConfigError):
-            load_project(self.root)
+    def test_duplicate_run_is_idempotent(self):
+        with TemporaryDirectory() as t:
+            led = Ledger(Path(t)/"ledger.jsonl")
+            self.assertTrue(led.record("cloud", "run-1", 5))
+            self.assertFalse(led.record("cloud", "run-1", 5))
+            self.assertEqual(len(led.events()), 1)
 
+    def test_unverified_remote_rejected(self):
+        with TemporaryDirectory() as t:
+            led = Ledger(Path(t)/"ledger.jsonl")
+            with self.assertRaisesRegex(BrokerError, "unverified"):
+                led.reserve(provider="cloud", spec={"adapter": "metered", "verified": False,
+                            "enabled": True, "quota": 100}, project="a", run_ref="run", units=5)
+
+class ConfigTests(unittest.TestCase):
+    def test_project_config_does_not_require_extracta(self):
+        with TemporaryDirectory() as t:
+            root = Path(t)
+            (root/".ci-broker").mkdir()
+            (root/".ci-broker"/"project.json").write_text(json.dumps(sample()))
+            self.assertEqual(project(root)["project_id"], "sample")
+
+    def test_shell_command_string_rejected(self):
+        with TemporaryDirectory() as t:
+            root = Path(t); (root/".ci-broker").mkdir()
+            c = sample(); c["tasks"]["format"]["command"] = "rm -rf /"
+            (root/".ci-broker"/"project.json").write_text(json.dumps(c))
+            with self.assertRaisesRegex(BrokerError, "argv array"):
+                project(root)
+
+    def test_explicit_missing_accounts_config_fails_closed(self):
+        with mock.patch.dict("os.environ", {"CI_BROKER_ACCOUNTS": "/this/path/does/not/exist.json"}):
+            with self.assertRaises(BrokerError):
+                accounts()
+
+    def test_default_accounts_local_only_when_no_override(self):
+        with TemporaryDirectory() as t:
+            with mock.patch.dict("os.environ", {}, clear=True):
+                with mock.patch("ci_broker.config.account_path", return_value=Path(t) / "missing.json"):
+                    self.assertEqual(list(accounts()), ["local"])
 
 if __name__ == "__main__":
     unittest.main()

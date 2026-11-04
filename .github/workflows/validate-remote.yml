@@ -1,0 +1,118 @@
+name: CI Broker remote validation (public free runner)
+
+on:
+  push:
+    branches:
+      - feature/circleci-remote-cli-20261104
+      - feature/agent-gateway-main-20261104
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-broker-remote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13', '3.15.2']
+    env:
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify source and interpreter
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python --version
+          python -m pip install -e .
+      - name: Run complete offline acceptance (no external CI dispatch)
+        run: |
+          set -euo pipefail
+          PYTHON=python bash scripts/validate_local.sh
+      - name: Smoke remote CLI and webhook in help-only mode
+        run: |
+          set -euo pipefail
+          ci-broker capabilities
+          ci-broker dispatch --help
+          ci-broker jobs --help
+          ci-broker legacy --help
+          ci-broker-legacy --help
+          ci-broker-remote --help
+          ci-broker legacy webhook --help
+          ci-broker-remote --help
+          ci-broker-webhook --help
+          python -c 'import ci_broker.remote, ci_broker.webhook; print("REMOTE_IMPORT_PASS")'
+
+  mcp-extension-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        mcp-range: ['mcp>=1,<2', 'mcp>=2,<3']
+    env:
+      MCP_RANGE: ${{ matrix.mcp-range }}
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install optional MCP dependency and verify tool registry
+        run: |
+          set -euo pipefail
+          python -m pip install -e '.[mcp]' "$MCP_RANGE"
+          python - <<'PY'
+          import asyncio
+          import inspect
+          from ci_broker.mcp_server import mcp
+          getter = getattr(mcp, 'list_tools', None)
+          if getter is None:
+              getter = mcp._tool_manager.list_tools
+          actual = getter()
+          if inspect.isawaitable(actual):
+              actual = asyncio.run(actual)
+          names = {tool.name for tool in actual}
+          expected = {'ci_plan', 'ci_dispatch', 'ci_status', 'ci_cancel', 'ci_jobs', 'ci_artifacts', 'ci_logs'}
+          assert names == expected, (names, expected)
+          print('CI_BROKER_MCP_TOOLS_REGISTERED 7')
+          PY
+
+  baseline-v011-p5:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CIRCLECI_TOKEN: ''
+      CI_BROKER_GITHUB_TOKEN: ''
+      CI_BROKER_WEBHOOK_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 81e9fef5d7dbe8ebf756a13c6733e3f265403261
+          path: baseline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.15.2'
+      - name: Independently validate exact v0.1.1 stabilization source
+        run: |
+          set -euo pipefail
+          cd baseline
+          test "$(git rev-parse HEAD)" = '81e9fef5d7dbe8ebf756a13c6733e3f265403261'
+          python -m pip install -e .
+          PYTHON=python bash scripts/validate_local.sh
+          echo CI_BROKER_P5_BASELINE_ATTESTED

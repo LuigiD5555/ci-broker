@@ -1,0 +1,33 @@
+{
+  "local": {
+    "adapter": "local",
+    "enabled": true,
+    "verified": true,
+    "independent": false,
+    "preferred": true,
+    "quota": null,
+    "capabilities": [
+      "python",
+      "rust",
+      "go",
+      "node",
+      "java",
+      "docker",
+      "linux"
+    ]
+  },
+  "cloud_example": {
+    "adapter": "metered",
+    "enabled": false,
+    "verified": false,
+    "independent": true,
+    "quota": 1000,
+    "unit": "compute-minutes",
+    "units_per_minute": 1,
+    "billing_increment_seconds": 60,
+    "reserve_fraction": 0.1,
+    "capabilities": [
+      "python"
+    ]
+  }
+}

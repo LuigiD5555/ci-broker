@@ -1,14 +1,42 @@
+# CI Broker · Agent Gateway (v0.2.0)
+
+**Main = gateway para agentes.** Una interfaz de CI independiente del proveedor y del cliente: ChatGPT/GitHub, MCP, CLI; CircleCI es el primer backend implementado.
+
+### Inicio rápido
+
+```bash
+python -m pip install -e '.[mcp]'
+ci-broker capabilities
+ci-broker dispatch --help
+ci-broker legacy --help
+ci-broker-legacy --help
+ci-broker-mcp
+```
+
+**El CI Broker anterior sigue disponible** en [legacy/original-main-20261104](../../tree/legacy/original-main-20261104) (SHA `a8ed1bb6199cddf7d9d9f841ff36528bf7bf0c2c`). Su motor local sigue instalado mediante `ci-broker legacy`.
+
+### Control desde ChatGPT por GitHub
+
+En el [issue #2](https://github.com/LuigiD5555/ci-broker/issues/2) puedo escribir `/ci-broker capabilities` o `/ci-broker selftest` con la conexión GitHub existente. El workflow en `main` valida usuario y issue exactos; solo devuelve información pública y ejecuta pruebas offline. **La ejecución remota con gastos está deshabilitada en este hook** y no se registran secretos ni logs privados.
+
+### Estado de la integración
+
+Las operaciones de Gateway `dispatch/status/jobs/artifacts/logs/cancel` son agnósticas al transporte. Solo CircleCI cuenta con backend remoto; `logs` obtiene metadatos de pasos, no stdout privado. MCP incluye siete herramientas; el endpoint remoto autenticado aún no está alojado ni conectado a ChatGPT.
+
+Documentación: [Diseño principal](docs/GATEWAY_MAIN.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Conexión CircleCI](docs/REMOTE_CI.md) · [Validación](docs/INFORME_VALIDACION_0_1_1.md)
+
+---
+
+## Base histórica 0.1.1 (legacy compatibility)
 # CI Broker
 
-**Project-agnostic, local-first CI planning and execution.** CI Broker is an installable Python package that reads a project's validation profiles, selects compatible providers using their own quota units, protects shared compute budgets and optionally executes explicitly approved commands locally.
+**Project-agnostic, local-first CI planning and budget orchestration.** Install it once and reuse it across Python, Rust, Go, Java, mixed-language, or custom projects. Your project supplies **what** to test. CI Broker decides **which tests and in what order**, **where resources are available**, and **whether budget permits the run**.
 
-CI Broker does **not** know what Extracta, BPFW, a Python API, or a Rust application is. Each consumer supplies a small declarative file. Like BPFW, it operates on a target directory with `--project-root`.
+> **Status: v0.1.1 stabilization candidate.** Baseline P5 offline acceptance passed with Python 3.15.2 on exact commit `81e9fef5d7dbe8ebf756a13c6733e3f265403261` (57 tests; [evidence](docs/INFORME_VALIDACION_0_1_1.md)). Experimental CircleCI dispatch and stdio MCP are **not yet live-integrated**. Local execution and advisory provider planning are implemented. Cloud accounts, remote dispatch, auto-generated vendor pipelines, hosted quotas, and native test discovery are **not** connected yet. Never interpret a configuration file as proof that a cloud runner is active.
 
-> **Status: v0.1.0, early standalone core.** Local execution, planning, reservations and two illustrative CI renderers are implemented. Remote provider dispatch, billing API sync, and graph-based test deduplication are future work. No cloud account or daemon is necessary.
+## Quick start (5 minutes)
 
-## 1. Install
-
-Python 3.11+ on a POSIX system (uses `fcntl` for ledger file locks). No runtime third-party dependencies.
+Requires **Python 3.11+** on Linux, macOS or POSIX systems supporting `fcntl`. CI Broker itself uses only the Python standard library; your test commands can use any runtime.
 
 ```bash
 git clone https://github.com/LuigiD5555/ci-broker.git
@@ -17,139 +45,198 @@ python3 -m pip install -e .
 ci-broker --help
 ```
 
-## 2. Five-minute quick start
+In **another project**:
 
 ```bash
-# From any project folder:
-cd /path/to/a-project
+cd /path/to/my-project
 ci-broker init
-# Edit .ci-broker/project.toml to use THIS project's actual commands.
-ci-broker validate
-ci-broker providers
+# Edit .ci-broker/project.json to select your real test commands
 ci-broker plan --profile light
-ci-broker run --profile light --yes
+ci-broker run --profile light --local --approve
 ```
 
-`init` never overwrites an existing configuration. `plan`, `validate`, `providers` and `render` do not run tests or dispatch CI. `run --yes` executes the commands in the local project configuration; only approve trusted files.
+`plan` **never executes tests or spends credits**. `run` only executes project-defined commands **locally**, with no shell interpolation (`shell=False`), and requires both `--approve` **and a successful local-provider admission decision**. A disabled or incapable local provider blocks execution; timeouts terminate the isolated process group. The default generated project runs `python --version` as a safe placeholder, **not** as a real test suite.
 
-## 3. Project file
+### How it works
 
-Create `.ci-broker/project.toml` in the consumer project:
-
-```toml
-schema = 1
-
-[project]
-id = "sample-api"
-
-[profiles.light]
-commands = ["python -m unittest discover -s tests"]
-minutes = 3
-timeout_minutes = 10
-requires = ["python"]
-
-[profiles.full]
-commands = ["python -m unittest discover -s tests -v"]
-minutes = 15
-timeout_minutes = 30
-requires = ["python"]
-independent = true
-
-[policy]
-prefer_local = true
-require_approval = true
-allow_paid_overage = false
-reserve_fraction = 0.10
+```text
+any project directory
+  └── .ci-broker/project.json    ← project-specific adapter/configuration
+                │
+                ▼
+        ci_broker core package
+        ├── config + validation
+        ├── dependency graph / deterministic test order
+        ├── provider adapter registry
+        ├── local-first budget-aware planner
+        └── append-only shared ledger with atomic reservations
+                │
+       ┌────────┴────────────┐
+       ▼                     ▼
+local execution        cloud advice + budget reserve
+(explicit approval)    (NO remote dispatch)
 ```
 
-For different languages, **only the commands and capabilities change**. For Rust, `commands = ["cargo test --locked"]` and `requires = ["rust"]`; for Go, `commands = ["go test ./..."]` and `requires = ["go"]`. There are ready-to-copy files under [`examples/`](examples/README.md).
+The core has **no Extracta-specific imports**, no fixed Python version for test projects, no hard-coded paths inside consumers, no account tokens, and no always-running service.
 
-## 4. Use CI Broker from outside the project
+## Project configuration
 
-```bash
-ci-broker --project-root /work/extracta validate
-ci-broker --project-root /work/extracta plan --profile light
-ci-broker --project-root /work/extracta run --profile light --yes
-```
-
-This is deliberately similar to BPFW's `--project-root` design. The package remains installed once; any number of projects can consume it.
-
-## 5. Commands and effects
-
-| CLI | Purpose | Side effects |
-| --- | --- | --- |
-| `init` | Create editable config | Writes `.ci-broker/project.toml` |
-| `validate` | Check project and provider configuration | Read only |
-| `providers` | Show configured pools, quotas and verified status | Read only |
-| `plan --profile light` | Suggest eligible capacity, expected and worst-case spend | Read only |
-| `plan --profile full --independent` | Require an independent verified provider | Read only |
-| `run --profile light --yes` | Execute declared commands in target working directory | **Runs local commands** |
-| `render --provider github --profile light` | Generate an illustrative manual CI configuration | Prints YAML only |
-| `render --provider gitlab --profile light` | Generate an illustrative web-triggered configuration | Prints YAML only |
-| `usage` | Display known usage and outstanding holds | Read only |
-| `reserve --provider P --profile light --run-ref ID` | Lock worst-case capacity | Writes ledger; **never launches CI** |
-| `settle --provider P --run-ref ID --units N` | Close a verified execution | Writes ledger |
-| `cancel --provider P --run-ref ID` | Cancel a verified pending job | Writes ledger |
-
-Run `ci-broker --help` and `ci-broker <subcommand> --help` for arguments.
-
-## 6. How the budget planner works
-
-Each provider has its own billing unit, such as minutes or credits. CI Broker calculates the *expected* cost and the *worst-case* cost from `minutes`, `timeout_minutes`, billing granularity and `rate_per_minute`. It checks capability requirements, the remaining quota, outstanding reservations and a protected fraction. When the project prefers local compute, a compatible local provider takes priority.
-
-**Shared ledger:** `~/.local/state/ci-broker/ledger.jsonl`. Point `CI_BROKER_LEDGER` to an absolute shared ledger location when multiple projects use the same provider account. All projects must use the same provider ID for the same quota pool. File locks protect parallel reservations on a local POSIX filesystem.
-
-Unverified external accounts are **ineligible** until the operator provides verified quotas. `plan` is advisory; it never uses cloud credentials, connects accounts or starts a job. Unmetered local is not an assertion of unlimited CPU resources.
-
-## 7. Add providers without changing core
-
-Operator-specific JSON configuration goes under `~/.config/ci-broker/providers.d/` (or the directory defined by `CI_BROKER_PROVIDERS_DIR`). For instance:
+Put `.ci-broker/project.json` at the root of **any** repository. Example:
 
 ```json
 {
-  "my-ci": {
-    "label": "Private hosted worker",
-    "adapter": "metered",
-    "enabled": false,
-    "verified": false,
-    "independent": true,
-    "quota": 500,
-    "unit": "credits",
-    "rate_per_minute": 2,
-    "billing_increment_seconds": 60,
-    "capabilities": ["python", "rust"]
+  "schema": 1,
+  "project_id": "my-service",
+  "tasks": {
+    "lint": {
+      "command": ["python", "-m", "compileall", "-q", "src"],
+      "expected_minutes": 1,
+      "timeout_minutes": 3,
+      "capabilities": ["python"]
+    },
+    "unit": {
+      "needs": ["lint"],
+      "command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+      "expected_minutes": 3,
+      "timeout_minutes": 10,
+      "capabilities": ["python"]
+    }
+  },
+  "profiles": {
+    "light": ["unit"],
+    "full": ["unit"]
   }
 }
 ```
 
-By design, existing provider keys may be overridden in local operator JSON (e.g. to supply a *verified* account allowance) without editing packaged defaults. Don't place tokens or secrets in JSON. Invalid adapter references are rejected.
+Selecting `unit` automatically includes its transitive dependency `lint`, **once**. Cycles and missing dependencies fail closed. Execution is sequential in v0.1.0; the reported **critical path** is informational and does not imply concurrency.
 
-For non-linear billing, publish a trusted Python class implementing `ProviderAdapter.quote(provider, profile) -> Quote` and `eligible(provider, profile) -> (bool, reason)` and register an entry point in the `ci_broker.adapters` group. Load explicitly with `--trusted-adapter your-adapter`. Catalog JSON never loads arbitrary Python by itself.
-
-## 8. Provider pipeline examples
+Try:
 
 ```bash
-ci-broker render --provider github --profile light > ci-broker-github-example.yml
-ci-broker render --provider gitlab --profile light > ci-broker-gitlab-example.yml
+ci-broker plan --profile light
+ci-broker run --profile light --local --approve
+ci-broker --project-root /path/to/another-project plan --profile full
 ```
 
-These are templates to inspect, **not verified active pipelines**. They intentionally don't execute project tests until the operator reviews the runner, installs the package in the target environment and approves execution. Real-world CI services may require specific Python, Rust, Docker or database images, and their published free quotas are not guaranteed available in your account.
+Commands are argument arrays. **Do not** use `"command": "curl ... | bash"`; string commands are rejected. For a project-owned shell script, explicitly use `["sh", "scripts/test.sh"]` and review the script.
 
-## 9. Example with Extracta
+## Shared CI budgets across projects
 
-Extracta consumes the core like any other project. See [`examples/extracta/.ci-broker/project.toml`](examples/extracta/.ci-broker/project.toml): it declares its own Python 3.15.2 validation command. The engine has no reference to Extracta in its Python source. Keep the existing Extracta Q12 workflow separately while validating equivalence; do not silently migrate full acceptance or connect paid providers.
+All projects on one machine use the **same provider-account catalog and ledger**. An explicitly configured but missing `CI_BROKER_ACCOUNTS` file is an error, not a reason to fall back to the default local account:
 
-## 10. Run the tests
+- Provider accounts: `~/.config/ci-broker/providers.json` or `CI_BROKER_ACCOUNTS=/absolute/path/providers.json`
+- State: `~/.local/state/ci-broker/ledger.jsonl` or `CI_BROKER_LEDGER=/absolute/path/ledger.jsonl`
+- Project declaration: `.ci-broker/project.json` (**in each project**, version controlled)
+
+Without a provider-account file, the broker offers a single **local** provider by default. Example optional account catalog (illustrative quota, **NOT account verified**):
+
+```json
+{
+  "local": {
+    "adapter": "local",
+    "enabled": true,
+    "verified": true,
+    "independent": false,
+    "preferred": true,
+    "quota": null,
+    "capabilities": ["python", "rust", "go", "node", "java", "docker", "linux"]
+  },
+  "example-cloud": {
+    "adapter": "metered",
+    "enabled": false,
+    "verified": false,
+    "independent": true,
+    "quota": 100,
+    "unit": "credits",
+    "units_per_minute": 2,
+    "billing_increment_seconds": 60,
+    "reserve_fraction": 0.10,
+    "capabilities": ["python"]
+  }
+}
+```
+
+`enabled=false` keeps a provider out of recommendations. `verified=false` prevents remote **selection and reservations**, even if someone enables the provider. Unverified providers remain visible as ineligible diagnostic candidates. Verify real quotas, actual account status, runtime capability, pricing and billing before changing either. A reservation never starts a workflow.
 
 ```bash
+ci-broker providers
+ci-broker plan --profile light --independent
+ci-broker reserve --profile light --provider example-cloud --run-ref project/job-123 # BLOCKED until verified/enabled
+ci-broker finish --provider example-cloud --run-ref project/job-123 --units 8
+# Or omit --units to cancel a reservation AFTER confirming no job is running.
+ci-broker record --provider example-cloud --run-ref external-job-456 --units 7
+ci-broker status
+```
+
+The last four commands operate on the **shared ledger**. `record` is idempotent for identical observations by provider/job ID; a conflicting amount is rejected. The broker protects the **highest** observed or settled usage for a run and never silently overwrites a larger amount with a smaller one. Reservations lock the file across processes, guard the worst-case time budget, and protect a configurable quota fraction (default 10%). **An unfinished job continues to hold quota across month boundaries.** Billing adjustments and remote-state reconciliation are not automated.
+
+A per-machine ledger is **not** a distributed database. Multiple separate machines must use an explicitly coordinated shared service to enforce truly global limits; do not mount one JSONL over unreliable network filesystems and assume correctness.
+
+## Provider plugins
+
+Two built-in models: `local` and `metered`. A trusted external package can add additional billing and capability rules through the `ci_broker.providers` entry-point group:
+
+```toml
+[project.entry-points."ci_broker.providers"]
+my-provider = "some_package.provider:MyProvider"
+```
+
+Implement `quote(spec, task) -> Quote` and `eligible(spec, task) -> (bool, reason)`. Install and **explicitly** enable the trusted package:
+
+```bash
+ci-broker --plugin my-provider plan --profile light
+```
+
+No plugin is imported just because a JSON configuration names it. Plugins are trusted Python code and should be reviewed before installation. Remote-dispatch adapters are not implemented yet: plugin registration does not grant execution or cloud billing permissions.
+
+## Copyable project examples
+
+- [Python + unittest](examples/python/.ci-broker/project.json)
+- [Rust + Cargo](examples/rust/.ci-broker/project.json)
+- [Go + go test](examples/go/.ci-broker/project.json)
+- [Node.js + npm](examples/node/.ci-broker/project.json)
+- [Extracta consumer integration](examples/extracta/.ci-broker/project.json)
+- [Provider account catalog](examples/providers.json)
+- [Quick-start guide in Spanish](docs/GUIA_RAPIDA_ES.md)
+- [LLM quick context / machine-readable interface](docs/LLM_CONTEXT.md)
+- [Architecture, contracts, security and roadmap](docs/ARCHITECTURE.md)
+
+To try any example against its own project, copy the example's `.ci-broker/project.json` into that project's root and adapt the paths and commands. The Rust and Extracta examples refer to **files of their respective projects**, not files inside this broker repository.
+
+## Development and tests
+
+```bash
+bash scripts/validate_local.sh  # offline; no GitHub Actions
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
+# Optional on-demand GitHub Actions: Actions → Core tests (manual only) → Run workflow
+python3 -m pip install -e .
+ci-broker --help
 ```
 
-## 11. For future agents and LLMs
+The package ships without automatic cloud webhooks, provider credentials or background jobs. No `main` merge in the original Extracta repository is required to start using CI Broker independently.
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) defines ownership boundaries, extension contracts, execution guards and limitations.
-- [`docs/LLM_CONTEXT.md`](docs/LLM_CONTEXT.md) is a short handoff document with exact project state, file layout, tests and rules for safe continuation.
-- [`examples/README.md`](examples/README.md) contains copy-and-paste examples for Python, Rust and Extracta.
+## Current limitations
 
-The architecture is **core → providers/adapters + consumer project profiles**. Never put project-specific test commands into `src/ci_broker/`. Build remote capabilities as independent adapters, never into the budget scheduler.
+- **Local-only execution.** Cloud provider planning/reservation is advisory; no job trigger, polling, cloud pipeline rendering or authenticated billing synchronization yet.
+- **No automatic language detection** or changed-file test selection yet. Projects declare tasks, commands, capabilities and their dependency DAG explicitly.
+- **No parallel test execution**, historical test-cost learning or mathematical optimization yet. Deterministic topological order and a critical-path estimate are implemented.
+- **No guaranteed free cloud compute.** Limits are account-specific; the broker refuses unverified remote reservations.
+- **POSIX file locks only.** Windows needs a platform-specific ledger backend.
+
+For implementation decisions and extension boundaries, read `docs/ARCHITECTURE.md`. For a compact context file to load into an LLM, use `docs/LLM_CONTEXT.md`.
+
+## License
+
+MIT; see [LICENSE](LICENSE).
+
+## Stabilization plan (v0.1.1)
+
+Before expanding remote integrations or enabling cloud CI, follow the bounded [v0.1.1 stabilization plan](docs/PLAN_ESTABILIZACION_0_1_1.md) (Spanish). It records 16 safety/behavior invariants, six closed work packages (P0–P5), offline tests, release gates and explicit non-goals. **The stabilization candidate implements the proposed corrections, but P5 requires actual offline execution before declaring PASS.**
+
+## Experimental remote CLI and local MCP tool
+
+The opt-in [CircleCI remote extension](docs/REMOTE_CI.md) supports `ci-broker remote plan`, explicit-budget `dispatch`, one-shot `status`, and guarded `cancel`. A local stdio `ci-broker-mcp` facade is available via the optional `.[mcp]` extra. This does **not** grant ChatGPT remote access or connect a CircleCI account automatically. Feature branch only; current v0.1.1 stabilization acceptance remains pending.
+
+**GitHub command bridge (optional):** The operator-hosted `ci-broker-webhook` receives signed `issue_comment` deliveries and checks author, repository, PR head SHA and explicit `--approve` before triggering a budget-fenced profile. Setup: [REMOTE_CI.md](docs/REMOTE_CI.md). It is not hosted or enabled by this PR.

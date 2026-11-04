@@ -3,20 +3,31 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "project-ci-broker"
-version = "0.1.0"
-description = "Project-agnostic local-first CI planning, budgeting and execution"
-requires-python = ">=3.11"
+name = "agnostic-ci-broker"
+version = "0.2.0"
+description = "Project-agnostic local-first CI planning and shared budget accounting"
 readme = "README.md"
+requires-python = ">=3.11"
 license = {text = "MIT"}
-keywords = ["ci", "orchestration", "test-scheduling", "local-first", "plugins"]
-classifiers = ["Programming Language :: Python :: 3", "Operating System :: POSIX :: Linux"]
+authors = [{name = "CI Broker contributors"}]
+dependencies = []
 
 [project.scripts]
-ci-broker = "ci_broker.cli:main"
+ci-broker = "ci_broker.gateway_cli:main"
+ci-broker-legacy = "ci_broker.cli:main"
+ci-broker-remote = "ci_broker.remote:main"
+ci-broker-mcp = "ci_broker.mcp_server:main"
+ci-broker-webhook = "ci_broker.webhook:main"
 
-[project.entry-points."ci_broker.adapters"]
-# Third-party packages may register a trusted provider adapter under this group.
+[project.optional-dependencies]
+mcp = ["mcp>=1,<3"]
+
+[project.entry-points."ci_broker.providers"]
+# Third-party packages may register trusted ProviderAdapter factories here.
+github-actions = "ci_broker.plugins.github_actions:GitHubActionsReader"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.entry-points."ci_broker.remote_providers"]
+# Trusted third-party clients: selected explicitly via --trust-provider.

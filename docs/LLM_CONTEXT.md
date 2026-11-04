@@ -1,63 +1,86 @@
-# CI Broker — portable LLM handoff
+# Instrucción de continuidad (Agent Gateway en main)
 
-Read this file first when continuing implementation from another chat, agent or LLM.
+El destino de CI Broker es un gateway agnóstico a proveedores y asistentes. `ci_broker.gateway.Gateway` es la API principal, `ci_broker.cli` es legado compatible. `main` original está en `legacy/original-main-20261104`. El control GitHub en issue #2 solo admite `capabilities` y `selftest`: no gastar créditos ni publicar evidencia privada. No declarar CircleCI o Extracta G5b validada sin evidencia auténtica. Ver `docs/GATEWAY_MAIN.md`.
 
-## Identity
+---
 
-Repository: `LuigiD5555/ci-broker`. Package distribution name: `project-ci-broker`. Import package: `ci_broker`. CLI: `ci-broker`. This repository is **separate from** `LuigiD5555/extracta` and is intended for any programming language or project.
+# CI Broker — handoff context for AI coding assistants
 
-## Goal
+**Repository:** https://github.com/LuigiD5555/ci-broker  
+**Version:** 0.1.1 stabilization candidate (P5 runtime acceptance pending)  
+**Purpose:** a reusable, project-agnostic, local-first CI planner and budget ledger. Extracta is a consumer, not a dependency.
 
-Project-agnostic, local-first CI execution and quota planning. Make provider plugins and project descriptors independent of the core. Shared budgets must remain coherent when multiple projects share a provider account. Extracta is a consumer, not a compile-time dependency.
+## Before modifying anything
 
-## Actual implemented scope (v0.1.0)
+1. Read `README.md` and `docs/ARCHITECTURE.md`.
+2. Inspect `src/ci_broker/model.py` and the public CLI surface in `src/ci_broker/cli.py`.
+3. Run `python3 -m unittest discover -s tests -v`.
+4. Preserve the project-agnostic boundary: **do not add imports of Extracta, BPFW or Guenda into the core**.
+5. Maintain existing CLI commands and schema version unless a migration is explicitly approved.
+6. Never dispatch paid CI or expose tokens without explicit per-run approval. The experimental CircleCI-only CLI requires `--approve` and operator-controlled credentials. See `docs/REMOTE_CI.md`.
 
-- Python 3.11+ package using standard library runtime and a `pyproject.toml` CLI entry point.
-- Project TOML: `.ci-broker/project.toml` in the target project, or `--project-root /path`.
-- `init`, `validate`, `providers`, `plan`, `run --yes`, `render`, `usage`, `reserve`, `settle`, `cancel`.
-- Metered/unmetered adapter contract, opt-in trusted Python entry points, local account-specific JSON overrides.
-- POSIX file-lock append-only reservation/settlement ledger; protected quotas and conservative cross-month holds.
-- GitHub/GitLab illustrative **manual** YAML renderers.
-- Offline unit tests and examples under `examples/`.
+## Public interface
 
-## NOT implemented (do not claim otherwise)
+```text
+ci-broker [--project-root PATH] [--plugin NAME] init [--project-id ID]
+ci-broker [--project-root PATH] [--plugin NAME] plan --profile NAME [--independent]
+ci-broker [--project-root PATH] run --profile NAME --local --approve
+ci-broker providers
+ci-broker reserve --profile NAME --provider PROVIDER --run-ref REF
+ci-broker finish --provider PROVIDER --run-ref REF [--units REAL]
+ci-broker record --provider PROVIDER --run-ref REF --units REAL
+ci-broker status
+```
 
-No remote submission, cloud API synchronization, confirmed free cloud minutes, remote run cancellation, actual Q12 execution, graph-based test deduplication, free-tier quota fetching, dashboard, always-running service or PyPI publication.
+## Inputs and output
 
-## Commands to verify
+`project.json`: `schema=1`, `project_id`, `tasks[id]={command: argv[], needs?:id[], expected_minutes:number, timeout_minutes?:number, capabilities?:string[]}`, `profiles[profile]=[task-id]`.
+
+`providers.json` in operator config: `{provider_id: {adapter, enabled, verified, independent, preferred?, quota?, unit?, units_per_minute?, billing_increment_seconds?, reserve_fraction?, capabilities?:[], max_job_minutes?}}`.
+
+`plan` prints JSON with `schema`, `project`, `profile`, `selected`, `tasks`, `estimate`, `advisory_only`, `candidates`. The ledger is JSONL, with `reserve/settle/cancel/observed` events and provider-scoped run IDs.
+
+## Readable examples
+
+- `examples/python/.ci-broker/project.json` — Python syntax then unittest.
+- `examples/rust/.ci-broker/project.json` — Cargo fmt/test/clippy.
+- `examples/extracta/.ci-broker/project.json` — real consumer mapping.
+- `examples/providers.json` — local account + inactive external account.
+
+## Capability status
+
+**Implemented (stabilization branch, acceptance pending):** project root resolution, explicit task profiles, transitive DAG ordering, cycle detection, estimate, local approval-gated execution, per-provider metered quotes, protected budget, account-shared atomic reservations, idempotent observations, explicit trusted plugin registration, JSON CLI.
+
+**Experimental, not acceptance-verified:** opt-in CircleCI remote dispatch, one-shot status/cancel and local stdio MCP tools exist on the feature branch, but they require operator configuration, a matching consumer workflow and a real integration test before live use.
+
+**Not implemented:** automatic language discovery, pipeline generation, provider-agnostic remote dispatch, quota synchronization, actual cost predictions based on history, parallel execution, remote ledger backend, hosted ChatGPT connector. Never claim these exist.
+
+## Common usage
 
 ```bash
 python3 -m pip install -e .
-python3 -m unittest discover -s tests -v
-python3 -m compileall -q src tests
-ci-broker --project-root examples/python-project validate
-ci-broker --project-root examples/python-project plan --profile light
+ci-broker --project-root /path/to/project plan --profile light
+ci-broker --project-root /path/to/project run --profile light --local --approve
+CI_BROKER_ACCOUNTS=/path/to/providers.json ci-broker --project-root /path/to/project plan --profile light --independent
 ```
 
-## Architecture map
+## Acceptance criteria for changes
 
-- `src/ci_broker/models.py`: contracts, registry, quote calculation.
-- `src/ci_broker/config.py`: strict project TOML and operator provider JSON.
-- `src/ci_broker/scheduler.py`: planning and budget constraints.
-- `src/ci_broker/ledger.py`: append-only local state, concurrency.
-- `src/ci_broker/cli.py`: commands, local runtime.
-- `src/ci_broker/render.py`: illustrative CI templates.
-- `tests/`: offline verification.
-- `examples/`: consumer project profiles including Extracta.
+A code change passes only if unit tests and CLI checks pass for a Python >=3.11 environment; the project-agnostic import boundary remains intact; no cloud consumption occurs during unit tests; and docs/examples match behavior. If remote CI has not run, state `NOT_EXECUTED` instead of implying provider acceptance.
 
-## Non-negotiable development rules
+## Current priority: stabilization, not new CI providers
 
-1. Do NOT add Extracta-specific imports or command names inside `src/ci_broker`.
-2. Do NOT automatically trigger cloud services, pay for compute or enable cloud providers based solely on published free-tier figures.
-3. Do NOT merge or mutate Extracta `main` during work in this repository.
-4. Preserve `--project-root` support and offline standard-library functionality.
-5. Add tests for each new adapter and any ledger/concurrency policy change.
-6. Keep README and this handoff accurate; never claim unexecuted tests passed.
+Read [PLAN_ESTABILIZACION_0_1_1.md](PLAN_ESTABILIZACION_0_1_1.md) **before changing code**. It enumerates invariants INV-01..INV-16, work packages P0..P5, regression evidence and fail-closed acceptance. The audit baseline is `43f57333ebcceab081f566ee5d86d445410e4eaf`, with 20 passing tests under Python 3.15.2 but known safety/accounting defects. P0-P4 regression code is in `fix/stabilize-0.1.1`; P5 requires executed tests and a recorded Python 3.15.2 result. No GitHub Actions or other external CI credit expenditure, no changes to Extracta or `main`.
 
-## Recommended next steps
+## v0.1.1 protected behavior
 
-1. Add graph-based test node abstraction and deterministic dependency scheduler with caching by content hash.
-2. Add a project plugin interface for detecting runtime/tests, only when user opts in.
-3. Implement real read-only quota and run-status adapters per provider.
-4. Add explicit, separately permissioned remote dispatcher interfaces with approval and idempotency.
-5. Migrate Extracta's `tools/ci_broker` into a compatibility shim after parity tests, retaining its Q12 gate and historical ledger.
+- `plan`, `run` and `reserve` use consistent eligibility criteria. A rejected local plan cannot become an approved run.
+- Explicit missing `CI_BROKER_ACCOUNTS` paths fail. With no override, a local default is permissible.
+- Usage for one execution is the maximum of settlement and observations. Conflicting repeated observations are rejected pending an explicit audited reconciliation policy.
+- Cross-month reservations remain pending until their terminal event; no TTL automatically releases quota.
+- `init` writes portable `["python", "--version"]`. Local timeout terminates a process group.
+- Local acceptance command: `bash scripts/validate_local.sh` with Python 3.15.2. GitHub Actions is not required or authorized for this validation.
+
+## Feature-branch CLI for coding agents
+
+`ci-broker remote --project-root /path/to/project plan --profile NAME` is read-only. `ci-broker remote --project-root /path/to/project dispatch --profile NAME --sha SHA40 --branch BRANCH --provider auto --approve` is an explicitly billable action, guarded by budget and duplicate identity. `ci-broker remote status --run-ref REF` reads one saved receipt. `ci-broker remote cancel --run-ref REF --approve` cancels workflow jobs without releasing credits automatically. Local stdio `ci-broker-mcp` exposes `ci_plan`, `ci_dispatch`, `ci_status`, `ci_cancel` when `.[mcp]` is installed and a single `CI_BROKER_PROJECT_ROOT` is configured. ChatGPT cannot invoke a local stdio process through its GitHub connector alone.
