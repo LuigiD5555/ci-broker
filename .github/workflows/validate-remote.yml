@@ -52,7 +52,12 @@ jobs:
   mcp-extension-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        mcp-range: ['mcp>=1,<2', 'mcp>=2,<3']
     env:
+      MCP_RANGE: ${{ matrix.mcp-range }}
       CIRCLECI_TOKEN: ''
       CI_BROKER_GITHUB_TOKEN: ''
       CI_BROKER_WEBHOOK_SECRET: ''
@@ -64,7 +69,7 @@ jobs:
       - name: Install optional MCP dependency and verify tool registry
         run: |
           set -euo pipefail
-          python -m pip install -e '.[mcp]'
+          python -m pip install -e '.[mcp]' "$MCP_RANGE"
           python - <<'PY'
           import asyncio
           import inspect
