@@ -77,15 +77,23 @@ def _choose(cfg: dict, catalog: dict, profile: str, provider: str, ledger: Ledge
     return name, pool[name], decision
 
 
+class _NoRedirect(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class CircleCIClient:
     BASE = "https://circleci.com/api/v2"
 
-    def __init__(self, token: str):
+    def __init__(self, token: str, *, read_only: bool = False):
         if not token or any(x in token for x in "\r\n"):
             raise BrokerError("CIRCLECI_TOKEN environment variable required")
         self.token = token
+        self.read_only = read_only
 
     def call(self, method: str, endpoint: str, body: dict | None = None) -> dict:
+        if self.read_only and (method != "GET" or body is not None or self.BASE != "https://circleci.com/api/v2"):
+            raise BrokerError("Read-only CircleCI client refuses mutation or alternate API")
         if not endpoint.startswith("/") or ".." in endpoint or "?" in endpoint:
             raise BrokerError("Invalid CircleCI API path")
         headers = {"Circle-Token": self.token, "Accept": "application/json"}
@@ -95,7 +103,10 @@ class CircleCIClient:
             data = json.dumps(body, separators=(",", ":")).encode("utf-8")
         req = request.Request(self.BASE + endpoint, data=data, headers=headers, method=method)
         try:
-            with request.urlopen(req, timeout=20) as response:
+            # A read-only worker never forwards its API credential to redirects.
+            open_request = (request.build_opener(_NoRedirect()).open
+                            if self.read_only else request.urlopen)
+            with open_request(req, timeout=20) as response:
                 payload = response.read(2_000_001)
                 if len(payload) > 2_000_000:
                     raise BrokerError("CircleCI response too large")
