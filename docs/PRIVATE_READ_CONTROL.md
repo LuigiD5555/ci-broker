@@ -65,10 +65,10 @@ bytes are not fetched. No public control issue is used.
 - CircleCI v2 does not expose full step stdout here: raw_logs=UNAVAILABLE_API_V2.
   JUnit stored only as an artifact is not automatically interpreted. Logs/bytes
   require a separate bounded private provider capability, not arbitrary URL fetch.
-- API v2 requires a personal token. Project tokens are not supported. API token
-  permissions are inherited from its CircleCI user; GET-only enforcement in this
-  worker is not a server-side read-only scope. Use the least-privileged account
-  available; do not claim a fine-grained token scope that the UI does not offer.
+- API v2 requires a personal token. Project tokens are not supported. CircleCI's current token creation UI offers Read, Write and Admin access levels.
+  Select **Read** for this worker and a bounded expiry. Read covers all read
+  permissions available to its user; no per-project restriction was observed.
+  The worker additionally enforces GET-only operations.
 - No dispatch, rerun, cancel, budget enabling, billing reconciliation or persistent
   reservations are added to this transport. Repeated reads do not spend CircleCI
   compute credits, but Actions runner time uses the private repository allowance.
